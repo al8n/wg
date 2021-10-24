@@ -1,7 +1,7 @@
 [package]
 authors = ["Al Liu <scygliu1@gmail.com>"]
 name = "wg"
-description = "Go like Waitgroup for sync or async Rust"
+description = "Golang like WaitGroup implementation for sync/async Rust."
 homepage = "https://github.com/al8n/wg"
 repository = "https://github.com/al8n/wg.git"
 documentation = "https://docs.rs/wg/"
