@@ -1,0 +1,21 @@
+[package]
+authors = ["Al Liu <scygliu1@gmail.com>"]
+name = "wg"
+description = "Go like Waitgroup for sync or async Rust"
+homepage = "https://github.com/al8n/wg"
+repository = "https://github.com/al8n/wg.git"
+documentation = "https://docs.rs/wg/"
+readme = "README.md"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+
+[features]
+default = ["parking_lot"]
+std = []
+
+[dependencies]
+parking_lot = {version = "0.11.2", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.12.0", features = ["test-util", "rt", "rt-multi-thread", "macros"] }
