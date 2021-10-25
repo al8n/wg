@@ -143,10 +143,10 @@ macro_rules! cfg_not_std_expr {
 }
 
 #[cfg(feature = "std")]
-use std::sync::{Condvar, Mutex};
+use std::sync::{Condvar, Mutex, MutexGuard};
 
 #[cfg(not(feature = "std"))]
-use parking_lot::{Condvar, Mutex};
+use parking_lot::{Condvar, Mutex, MutexGuard};
 
 use std::future::Future;
 use std::ops::Sub;
@@ -586,9 +586,9 @@ impl Future for WaitGroupFuture<'_> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let waker = cx.waker().clone();
 
-        let mut g;
+        let mut g: MutexGuard<Option<Waker>>;
         cfg_std_expr! {
-            self.inner.waker.lock().unwrap();
+            g = self.inner.waker.lock().unwrap();
             *g = Some(waker);
         };
 
