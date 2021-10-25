@@ -8,7 +8,7 @@ documentation = "https://docs.rs/wg/"
 readme = "README.md"
 version = "0.1.1"
 license = "MIT OR Apache-2.0"
-keywords = ["waitgroup", "async", "sync", "notify", "futures", "wake"]
+keywords = ["waitgroup", "async", "sync", "notify", "wake"]
 categories = ["asynchronous", "concurrency", "data structures"]
 edition = "2021"
 
