@@ -124,31 +124,11 @@
 //! [rustc-image]: https://img.shields.io/badge/rustc-1.56.0%2B-orange.svg?style=for-the-badge&logo=Rust
 #![deny(missing_docs)]
 
-macro_rules! cfg_std {
-    ($($item: item)*) => {
-        $(
-        #[cfg(feature = "std")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-        $item
-        )*
-    };
-}
-
 macro_rules! cfg_std_expr {
     ($($item: expr;)*) => {
         $(
         #[cfg(feature = "std")]
-        $item
-        )*
-    };
-}
-
-macro_rules! cfg_not_std {
-    ($($item: item)*) => {
-        $(
-        #[cfg(not(feature = "std"))]
-        #[cfg_attr(docsrs, doc(cfg(not(feature = "std"))))]
-        $item
+        $item;
         )*
     };
 }
@@ -157,24 +137,22 @@ macro_rules! cfg_not_std_expr {
     ($($item: expr;)*) => {
         $(
         #[cfg(not(feature = "std"))]
-        $item
+        $item;
         )*
     };
 }
 
-cfg_std! {
-    use std::sync::{Mutex, Condvar};
-}
+#[cfg(feature = "std")]
+use std::sync::{Condvar, Mutex};
 
-cfg_not_std! {
-    use parking_lot::{Condvar, Mutex};
-}
+#[cfg(not(feature = "std"))]
+use parking_lot::{Condvar, Mutex};
 
 use std::future::Future;
 use std::ops::Sub;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
 struct Inner {
@@ -246,10 +224,13 @@ impl Clone for WaitGroup {
 
 impl std::fmt::Debug for WaitGroup {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        #[cfg(feature = "std")]
-            let count = self.inner.count.lock().unwrap();
-        #[cfg(not(feature = "std"))]
-            let count = self.inner.count.lock();
+        let count;
+        cfg_std_expr!(
+            count = self.inner.count.lock().unwrap();
+        );
+        cfg_not_std_expr!(
+            count = self.inner.count.lock();
+        );
         f.debug_struct("WaitGroup").field("count", &*count).finish()
     }
 }
@@ -298,14 +279,17 @@ impl WaitGroup {
     ///
     /// [`wait`]: struct.AsyncWaitGroup.html#method.wait
     pub fn add(&self, num: usize) -> Self {
-        #[cfg(feature = "std")]
-        let mut ctr = self.inner.count.lock().unwrap();
-        #[cfg(not(feature = "std"))]
-        let mut ctr = self.inner.count.lock();
+        let mut ctr;
+        cfg_std_expr!(
+            ctr = self.inner.count.lock().unwrap();
+        );
+        cfg_not_std_expr!(
+            ctr = self.inner.count.lock();
+        );
 
         *ctr += num;
         Self {
-            inner: self.inner.clone()
+            inner: self.inner.clone(),
         }
     }
 
@@ -327,10 +311,13 @@ impl WaitGroup {
     ///
     /// ```
     pub fn done(&self) {
-        #[cfg(feature = "std")]
-        let mut val = self.inner.count.lock().unwrap();
-        #[cfg(not(feature = "std"))]
-        let mut val = self.inner.count.lock();
+        let mut val;
+        cfg_std_expr!(
+            val = self.inner.count.lock().unwrap();
+        );
+        cfg_not_std_expr!(
+            val = self.inner.count.lock();
+        );
 
         *val = if val.eq(&1) {
             self.inner.cvar.notify_all();
@@ -386,7 +373,6 @@ impl WaitGroup {
         }
     }
 }
-
 
 struct AsyncInner {
     waker: Mutex<Option<Waker>>,
@@ -513,84 +499,49 @@ impl AsyncWaitGroup {
         }
     }
 
-    cfg_not_std! {
-        /// done decrements the WaitGroup counter by one.
-        ///
-        /// # Example
-        ///
-        /// ```rust
-        /// use wg::AsyncWaitGroup;
-        ///
-        /// #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
-        /// async fn main() {
-        ///     let wg = AsyncWaitGroup::new();
-        ///     wg.add(1);
-        ///     let t_wg = wg.clone();
-        ///     tokio::spawn(async move {
-        ///         // do some time consuming task
-        ///         t_wg.done()
-        ///     });
-        /// }
-        /// ```
-        pub fn done(&self) {
-            let _ = self
-                .inner
-                .count
-                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |val| {
-                    // We are the last worker
-                    if val == 1 {
-                        if let Some(waker) = self.inner.waker.lock().take() {
-                            waker.wake();
-                        }
-                        Some(0)
-                    } else if val == 0 {
-                        None
-                    } else {
-                        Some(val - 1)
+    /// done decrements the WaitGroup counter by one.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use wg::AsyncWaitGroup;
+    ///
+    /// #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
+    /// async fn main() {
+    ///     let wg = AsyncWaitGroup::new();
+    ///     wg.add(1);
+    ///     let t_wg = wg.clone();
+    ///     tokio::spawn(async move {
+    ///         // do some time consuming task
+    ///         t_wg.done();
+    ///     });
+    /// }
+    /// ```
+    pub fn done(&self) {
+        let _ = self
+            .inner
+            .count
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |val| {
+                // We are the last worker
+                if val == 1 {
+                    let waker;
+                    cfg_std_expr!(
+                        waker = self.inner.waker.lock().unwrap().take();
+                    );
+                    cfg_not_std_expr!(
+                        waker = self.inner.waker.lock().take();
+                    );
+                    if let Some(waker) = waker {
+                        waker.wake();
                     }
-                });
-        }
+                    Some(0)
+                } else if val == 0 {
+                    None
+                } else {
+                    Some(val - 1)
+                }
+            });
     }
-
-    cfg_std! {
-        /// done decrements the WaitGroup counter by one.
-        ///
-        /// # Example
-        ///
-        /// ```rust
-        /// use wg::AsyncWaitGroup;
-        ///
-        /// #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
-        /// async fn main() {
-        ///     let wg = AsyncWaitGroup::new();
-        ///     wg.add(1);
-        ///     let t_wg = wg.clone();
-        ///     tokio::spawn(async move {
-        ///         // do some time consuming task
-        ///         t_wg.done();
-        ///     });
-        /// }
-        /// ```
-        pub fn done(&self) {
-            let _ = self
-                .inner
-                .count
-                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |val| {
-                    // We are the last worker
-                    if val == 1 {
-                        if let Some(waker) = self.inner.waker.lock().unwrap().take() {
-                            waker.wake();
-                        }
-                        Some(0)
-                    } else if val == 0 {
-                        None
-                    } else {
-                        Some(val - 1)
-                    }
-                });
-        }
-    }
-
 
     /// wait blocks until the WaitGroup counter is zero.
     ///
@@ -619,7 +570,6 @@ impl AsyncWaitGroup {
     }
 }
 
-
 struct WaitGroupFuture<'a> {
     inner: &'a Arc<AsyncInner>,
 }
@@ -633,23 +583,19 @@ impl<'a> WaitGroupFuture<'a> {
 impl Future for WaitGroupFuture<'_> {
     type Output = ();
 
-    #[cfg(feature = "std")]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let waker = cx.waker().clone();
 
-        let mut g = self.inner.waker.lock().unwrap();
-        *g = Some(waker);
+        let mut g;
+        cfg_std_expr! {
+            self.inner.waker.lock().unwrap();
+            *g = Some(waker);
+        };
 
-        match self.inner.count.load(Ordering::Relaxed) {
-            0 => Poll::Ready(()),
-            _ => Poll::Pending,
+        cfg_not_std_expr! {
+            g = self.inner.waker.lock();
+            *g = Some(waker);
         }
-    }
-
-    #[cfg(not(feature = "std"))]
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let waker = cx.waker().clone();
-        *self.inner.waker.lock() = Some(waker);
 
         match self.inner.count.load(Ordering::Relaxed) {
             0 => Poll::Ready(()),
@@ -660,9 +606,9 @@ impl Future for WaitGroupFuture<'_> {
 
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
     use std::time::Duration;
 
     #[tokio::test]
@@ -805,5 +751,18 @@ mod test {
 
         wg.wait();
         assert_eq!(ctr.load(Ordering::Relaxed), 10);
+    }
+
+    #[test]
+    fn test_clone_and_fmt() {
+        let swg = WaitGroup::new();
+        let swg1 = swg.clone();
+        swg1.add(3);
+        assert_eq!(format!("{:?}", swg), format!("{:?}", swg1));
+
+        let awg = AsyncWaitGroup::new();
+        let awg1 = awg.clone();
+        awg1.add(3);
+        assert_eq!(format!("{:?}", awg), format!("{:?}", awg1));
     }
 }
