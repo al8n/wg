@@ -329,6 +329,19 @@ impl WaitGroup {
         };
     }
 
+    /// waitings return how many jobs are waiting.
+    pub fn waitings(&self) -> usize {
+        let num;
+        cfg_std_expr!(
+            num = self.inner.count.lock().unwrap().clone();
+        );
+
+        cfg_not_std_expr!(
+            num = self.inner.count.lock().clone();
+        );
+        num
+    }
+
     /// wait blocks until the WaitGroup counter is zero.
     ///
     /// # Example
@@ -541,6 +554,11 @@ impl AsyncWaitGroup {
                     Some(val - 1)
                 }
             });
+    }
+
+    /// waitings return how many jobs are waiting.
+    pub fn waitings(&self) -> usize {
+        self.inner.count.load(Ordering::SeqCst)
     }
 
     /// wait blocks until the WaitGroup counter is zero.
@@ -764,5 +782,21 @@ mod test {
         let awg1 = awg.clone();
         awg1.add(3);
         assert_eq!(format!("{:?}", awg), format!("{:?}", awg1));
+    }
+
+    #[test]
+    fn test_waitings() {
+        let wg = WaitGroup::new();
+        wg.add(1);
+        wg.add(1);
+        assert_eq!(wg.waitings(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_async_waitings() {
+        let wg = AsyncWaitGroup::new();
+        wg.add(1);
+        wg.add(1);
+        assert_eq!(wg.waitings(), 2);
     }
 }
