@@ -6,7 +6,7 @@ homepage = "https://github.com/al8n/wg"
 repository = "https://github.com/al8n/wg.git"
 documentation = "https://docs.rs/wg/"
 readme = "README.md"
-version = "0.2.0"
+version = "0.2.1"
 license = "MIT OR Apache-2.0"
 keywords = ["waitgroup", "async", "sync", "notify", "wake"]
 categories = ["asynchronous", "concurrency", "data structures"]
@@ -17,7 +17,7 @@ default = ["parking_lot"]
 std = []
 
 [dependencies]
-parking_lot = {version = "0.11.2", optional = true }
+parking_lot = {version = "0.12", optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.12.0", features = ["test-util", "rt", "rt-multi-thread", "macros"] }
+tokio = { version = "1.17", features = ["test-util", "rt", "rt-multi-thread", "macros"] }
