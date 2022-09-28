@@ -537,7 +537,6 @@ impl AsyncWaitGroup {
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |val| {
                 // We are the last worker
                 if val == 1 {
-                    
                     Some(0)
                 } else if val == 0 {
                     None
@@ -545,18 +544,18 @@ impl AsyncWaitGroup {
                     Some(val - 1)
                 }
             });
-        if let Ok(count) = res{
-            if count == 1{
+        if let Ok(count) = res {
+            if count == 1 {
                 let waker;
-                    cfg_std_expr!(
-                        waker = self.inner.waker.lock().unwrap().take();
-                    );
-                    cfg_not_std_expr!(
-                        waker = self.inner.waker.lock().take();
-                    );
-                    if let Some(waker) = waker {
-                        waker.wake();
-                    }
+                cfg_std_expr!(
+                    waker = self.inner.waker.lock().unwrap().take();
+                );
+                cfg_not_std_expr!(
+                    waker = self.inner.waker.lock().take();
+                );
+                if let Some(waker) = waker {
+                    waker.wake();
+                }
             }
         }
     }
@@ -806,14 +805,14 @@ mod test {
     }
 
     #[async_std::test]
-    async fn test_wake_after_updating(){
+    async fn test_wake_after_updating() {
         let wg = AsyncWaitGroup::new();
         for _ in 0..100000 {
             let worker = wg.add(1);
             async_std::task::spawn(async move {
                 async_std::task::sleep(std::time::Duration::from_millis(10)).await;
                 let mut _a = 0;
-                for _ in 0..1000{
+                for _ in 0..1000 {
                     _a += 1;
                 }
                 async_std::task::sleep(std::time::Duration::from_millis(10)).await;
