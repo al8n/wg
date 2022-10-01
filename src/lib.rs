@@ -152,8 +152,11 @@ use std::future::Future;
 use std::ops::Sub;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
+#[cfg(not(feature = "triomphe"))]
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
+#[cfg(feature = "triomphe")]
+use triomphe::Arc;
 
 struct Inner {
     cvar: Condvar,
@@ -209,6 +212,17 @@ impl Default for WaitGroup {
             inner: Arc::new(Inner {
                 cvar: Condvar::new(),
                 count: Mutex::new(0),
+            }),
+        }
+    }
+}
+
+impl From<usize> for WaitGroup {
+    fn from(count: usize) -> Self {
+        Self {
+            inner: Arc::new(Inner {
+                cvar: Condvar::new(),
+                count: Mutex::new(count),
             }),
         }
     }
@@ -442,6 +456,17 @@ impl Default for AsyncWaitGroup {
         Self {
             inner: Arc::new(AsyncInner {
                 count: AtomicUsize::new(0),
+                waker: Mutex::new(None),
+            }),
+        }
+    }
+}
+
+impl From<usize> for AsyncWaitGroup {
+    fn from(count: usize) -> Self {
+        Self {
+            inner: Arc::new(AsyncInner {
+                count: AtomicUsize::new(count),
                 waker: Mutex::new(None),
             }),
         }
@@ -705,6 +730,18 @@ mod test {
         assert_eq!(ctr.load(Ordering::Relaxed), 10);
     }
 
+    #[tokio::test]
+    async fn test_async_wait_group_from() {
+        let wg = AsyncWaitGroup::from(5);
+        for _ in 0..5 {
+            let t = wg.clone();
+            tokio::spawn(async move {
+                t.done();
+            });
+        }
+        wg.wait().await;
+    }
+
     #[test]
     fn test_sync_wait_group() {
         let wg = WaitGroup::new();
@@ -773,6 +810,20 @@ mod test {
 
         wg.wait();
         assert_eq!(ctr.load(Ordering::Relaxed), 10);
+    }
+
+    #[test]
+    fn test_sync_wait_group_from() {
+        std::thread::scope(|s| {
+            let wg = WaitGroup::from(5);
+            for _ in 0..5 {
+                let t = wg.clone();
+                s.spawn(move || {
+                    t.done();
+                });
+            }
+            wg.wait();
+        });
     }
 
     #[test]
