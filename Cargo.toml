@@ -17,6 +17,7 @@ default = ["parking_lot", "triomphe"]
 std = []
 
 [dependencies]
+atomic-waker = "1"
 parking_lot = {version = "0.12", optional = true }
 triomphe = { version = "0.1", optional = true }
 

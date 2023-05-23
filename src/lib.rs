@@ -143,10 +143,11 @@ macro_rules! cfg_not_std_expr {
 }
 
 #[cfg(feature = "std")]
-use std::sync::{Condvar, Mutex, MutexGuard};
+use std::sync::{Condvar, Mutex};
 
+use atomic_waker::AtomicWaker;
 #[cfg(not(feature = "std"))]
-use parking_lot::{Condvar, Mutex, MutexGuard};
+use parking_lot::{Condvar, Mutex};
 
 use std::future::Future;
 use std::ops::Sub;
@@ -154,7 +155,7 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(not(feature = "triomphe"))]
 use std::sync::Arc;
-use std::task::{Context, Poll, Waker};
+use std::task::{Context, Poll};
 #[cfg(feature = "triomphe")]
 use triomphe::Arc;
 
@@ -402,7 +403,7 @@ impl WaitGroup {
 }
 
 struct AsyncInner {
-    waker: Mutex<Option<Waker>>,
+    waker: AtomicWaker,
     count: AtomicUsize,
 }
 
@@ -456,7 +457,7 @@ impl Default for AsyncWaitGroup {
         Self {
             inner: Arc::new(AsyncInner {
                 count: AtomicUsize::new(0),
-                waker: Mutex::new(None),
+                waker: AtomicWaker::new(),
             }),
         }
     }
@@ -467,7 +468,7 @@ impl From<usize> for AsyncWaitGroup {
         Self {
             inner: Arc::new(AsyncInner {
                 count: AtomicUsize::new(count),
-                waker: Mutex::new(None),
+                waker: AtomicWaker::new(),
             }),
         }
     }
@@ -571,16 +572,7 @@ impl AsyncWaitGroup {
             });
         if let Ok(count) = res {
             if count == 1 {
-                let waker;
-                cfg_std_expr!(
-                    waker = self.inner.waker.lock().unwrap().take();
-                );
-                cfg_not_std_expr!(
-                    waker = self.inner.waker.lock().take();
-                );
-                if let Some(waker) = waker {
-                    waker.wake();
-                }
+                self.inner.waker.wake();
             }
         }
     }
@@ -631,22 +623,12 @@ impl Future for WaitGroupFuture<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let waker = cx.waker().clone();
-
-        let mut g: MutexGuard<Option<Waker>>;
-        cfg_std_expr! {
-            g = self.inner.waker.lock().unwrap();
-            *g = Some(waker);
-        };
-
-        cfg_not_std_expr! {
-            g = self.inner.waker.lock();
-            *g = Some(waker);
-        }
-
         match self.inner.count.load(Ordering::Relaxed) {
             0 => Poll::Ready(()),
-            _ => Poll::Pending,
+            _ => {
+                self.inner.waker.register(cx.waker());
+                Poll::Pending
+            }
         }
     }
 }
