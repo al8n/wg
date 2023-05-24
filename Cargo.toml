@@ -6,10 +6,10 @@ homepage = "https://github.com/al8n/wg"
 repository = "https://github.com/al8n/wg.git"
 documentation = "https://docs.rs/wg/"
 readme = "README.md"
-version = "0.3.1"
+version = "0.3.2"
 license = "MIT OR Apache-2.0"
 keywords = ["waitgroup", "async", "sync", "notify", "wake"]
-categories = ["asynchronous", "concurrency", "data structures"]
+categories = ["asynchronous", "concurrency", "data-structures"]
 edition = "2021"
 
 [features]
