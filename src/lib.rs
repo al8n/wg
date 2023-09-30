@@ -792,9 +792,11 @@ mod r#async {
                 let worker = wg.add(1);
                 async_std::task::spawn(async move {
                     async_std::task::sleep(std::time::Duration::from_millis(10)).await;
+                    let mut a = 0;
                     for _ in 0..1000 {
-                        async_std::task::yield_now().await;
+                        a += 1;
                     }
+                    println!("{a}");
                     async_std::task::sleep(std::time::Duration::from_millis(10)).await;
                     worker.done();
                 });
