@@ -25,6 +25,26 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Check formatting
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Rust
+      run: rustup update stable && rustup default stable
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
+  # Apply clippy lints
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Apply clippy lints
+      run: cargo clippy --all-features
+
   build:
     runs-on: ubuntu-latest
     strategy:
@@ -54,17 +74,18 @@ jobs:
           command: check
 
   coverage:
+    name: cargo tarpaulin
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust:
-          - nightly
+    needs: 
+      - build
+      - clippy
+      - rustfmt
     steps:
       - uses: actions/checkout@v3
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: nightly
           override: true
       - uses: actions-rs/install@v0.1
         with:
@@ -84,7 +105,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: tarpaulin
-          args: --run-types Tests,Doctests --features full --workspace --out Xml
+          args: --all-features --run-types tests --run-types doctests --workspace --out xml
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v3.1.1
         with:

@@ -21,7 +21,7 @@ Golang like WaitGroup implementation for sync/async Rust.
 ## Installation
 ```toml
 [dependencies]
-wg = "0.1.0"
+wg = "0.4"
 ```
 
 ## Example

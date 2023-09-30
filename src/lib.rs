@@ -40,7 +40,7 @@
 //! ## Installation
 //! ```toml
 //! [dependencies]
-//! wg = "0.1.0"
+//! wg = "0.4"
 //! ```
 //!
 //! ## Example
@@ -53,26 +53,25 @@
 //! use std::time::Duration;
 //! use std::thread::{spawn, sleep};
 //!
-//! fn main() {
-//!     let wg = WaitGroup::new();
-//!     let ctr = Arc::new(AtomicUsize::new(0));
+//! let wg = WaitGroup::new();
+//! let ctr = Arc::new(AtomicUsize::new(0));
 //!
-//!     for _ in 0..5 {
-//!         let ctrx = ctr.clone();
-//!         let t_wg = wg.add(1);
-//!         spawn(move || {
-//!             // mock some time consuming task
-//!             sleep(Duration::from_millis(50));
-//!             ctrx.fetch_add(1, Ordering::Relaxed);
+//! for _ in 0..5 {
+//!   let ctrx = ctr.clone();
+//!   let t_wg = wg.add(1);
+//!   spawn(move || {
+//!     // mock some time consuming task
+//!     sleep(Duration::from_millis(50));
+//!     ctrx.fetch_add(1, Ordering::Relaxed);
 //!
-//!             // mock task is finished
-//!             t_wg.done();
-//!         });
-//!     }
-//!
-//!     wg.wait();
-//!     assert_eq!(ctr.load(Ordering::Relaxed), 5);
+//!     // mock task is finished
+//!     t_wg.done();
+//!   });
 //! }
+//!
+//! wg.wait();
+//! assert_eq!(ctr.load(Ordering::Relaxed), 5);
+//!
 //! ```
 //!
 //! ### Async
@@ -123,6 +122,7 @@
 //! [license-mit-url]: https://opensource.org/licenses/MIT
 //! [rustc-image]: https://img.shields.io/badge/rustc-1.56.0%2B-orange.svg?style=for-the-badge&logo=Rust
 #![deny(missing_docs)]
+#![allow(clippy::needless_late_init)]
 
 macro_rules! cfg_std_expr {
     ($($item: expr;)*) => {
@@ -145,6 +145,7 @@ macro_rules! cfg_not_std_expr {
 #[cfg(feature = "std")]
 use std::sync::{Condvar, Mutex};
 
+#[cfg(feature = "atomic-waker")]
 use atomic_waker::AtomicWaker;
 #[cfg(not(feature = "std"))]
 use parking_lot::{Condvar, Mutex};
@@ -348,11 +349,11 @@ impl WaitGroup {
     pub fn waitings(&self) -> usize {
         let num;
         cfg_std_expr!(
-            num = self.inner.count.lock().unwrap().clone();
+            num = *self.inner.count.lock().unwrap();
         );
 
         cfg_not_std_expr!(
-            num = self.inner.count.lock().clone();
+            num = *self.inner.count.lock();
         );
         num
     }
@@ -579,10 +580,10 @@ impl AsyncWaitGroup {
 
     /// waitings return how many jobs are waiting.
     pub fn waitings(&self) -> usize {
-        self.inner.count.load(Ordering::SeqCst)
+        self.inner.count.load(Ordering::Acquire)
     }
 
-    /// wait blocks until the WaitGroup counter is zero.
+    /// wait blocks until the [`AsyncWaitGroup`] counter is zero.
     ///
     /// # Example
     ///
@@ -607,6 +608,41 @@ impl AsyncWaitGroup {
     pub async fn wait(&self) {
         WaitGroupFuture::new(&self.inner).await
     }
+
+    /// Wait blocks until the [`AsyncWaitGroup`] counter is zero. This method is
+    /// intended to be used in a non-async context,
+    /// e.g. when implementing the [`Drop`] trait.
+    ///
+    /// The implementation is like a spin lock, which is not efficient, so use it with caution.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use wg::AsyncWaitGroup;
+    ///
+    /// #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
+    /// async fn main() {
+    ///     let wg = AsyncWaitGroup::new();
+    ///     wg.add(1);
+    ///     let t_wg = wg.clone();
+    ///
+    ///     tokio::spawn( async move {
+    ///         // do some time consuming task
+    ///         t_wg.done()
+    ///     });
+    ///
+    ///     // wait other thread completes
+    ///     wg.block_wait();
+    /// }
+    /// ```
+    pub fn block_wait(&self) {
+        loop {
+            match self.inner.count.load(Ordering::Acquire) {
+                0 => return,
+                _ => core::hint::spin_loop(),
+            }
+        }
+    }
 }
 
 struct WaitGroupFuture<'a> {
@@ -623,7 +659,7 @@ impl Future for WaitGroupFuture<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match self.inner.count.load(Ordering::Relaxed) {
+        match self.inner.count.load(Ordering::Acquire) {
             0 => Poll::Ready(()),
             _ => {
                 self.inner.waker.register(cx.waker());
