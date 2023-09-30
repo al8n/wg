@@ -26,5 +26,5 @@ parking_lot = {version = "0.12", optional = true }
 triomphe = { version = "0.1", optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.32", features = ["test-util", "rt", "rt-multi-thread", "macros"] }
+tokio = { version = "1.32", features = ["full"] }
 async-std = { version = "1.12.0", features = ["attributes"]  }

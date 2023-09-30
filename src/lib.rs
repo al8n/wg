@@ -873,6 +873,23 @@ mod test {
         assert_eq!(wg.waitings(), 2);
     }
 
+    #[tokio::test]
+    async fn test_async_block_wait() {
+        let wg = AsyncWaitGroup::new();
+        wg.add(1);
+        let t_wg = wg.clone();
+
+        tokio::spawn(async move {
+            // do some time consuming task
+            t_wg.done()
+        });
+
+        // wait other thread completes
+        wg.block_wait();
+
+        assert_eq!(wg.waitings(), 0);
+    }
+
     #[async_std::test]
     async fn test_wake_after_updating() {
         let wg = AsyncWaitGroup::new();
