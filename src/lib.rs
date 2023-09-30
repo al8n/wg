@@ -123,7 +123,8 @@
 //! [license-mit-url]: https://opensource.org/licenses/MIT
 //! [rustc-image]: https://img.shields.io/badge/rustc-1.56.0%2B-orange.svg?style=for-the-badge&logo=Rust
 #![deny(missing_docs)]
-#![allow(clippy::needless_late_init)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, allow(unused_attributes))]
 
 trait Mu {
     type Guard<'a>
@@ -432,6 +433,7 @@ mod r#async {
     ///
     /// [`wait`]: struct.AsyncWaitGroup.html#method.wait
     /// [`add`]: struct.AsyncWaitGroup.html#method.add
+    #[cfg_attr(docsrs, doc(cfg(feature = "test")))]
     pub struct AsyncWaitGroup {
         inner: Arc<AsyncInner>,
     }
