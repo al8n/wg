@@ -1,8 +1,8 @@
-use wg::WaitGroup;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::thread::{sleep, spawn};
 use std::time::Duration;
-use std::thread::{spawn, sleep};
+use wg::WaitGroup;
 
 fn main() {
     let wg = WaitGroup::new();

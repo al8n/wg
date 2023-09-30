@@ -1,7 +1,10 @@
-use wg::AsyncWaitGroup;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tokio::{spawn, time::{sleep, Duration}};
+use std::sync::Arc;
+use tokio::{
+    spawn,
+    time::{sleep, Duration},
+};
+use wg::AsyncWaitGroup;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() {
