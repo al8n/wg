@@ -13,10 +13,9 @@ categories = ["asynchronous", "concurrency", "data-structures"]
 edition = "2021"
 
 [features]
-default = ["full"]
-full = ["sync", "async"]
-sync = ["parking_lot", "triomphe"]
-async = ["atomic-waker", "triomphe"]
+default = []
+full = ["async", "triomphe", "parking_lot"]
+async = ["atomic-waker"]
 triomphe = ["dep:triomphe"]
 parking_lot = ["dep:parking_lot"]
 

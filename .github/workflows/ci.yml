@@ -88,8 +88,8 @@ jobs:
         run: rustup update stable --no-self-update && rustup default stable
       - name: Test
         run: cargo test --no-default-features --features async
-  sync:
-    name: sync
+  full:
+    name: full
     strategy:
       matrix:
         os:
@@ -103,14 +103,14 @@ jobs:
         # --no-self-update is necessary because the windows environment cannot self-update rustup.exe.
         run: rustup update stable --no-self-update && rustup default stable
       - name: Test
-        run: cargo test --no-default-features --features sync
+        run: cargo test --no-default-features --features full
 
   coverage:
     name: cargo tarpaulin
     runs-on: ubuntu-latest
     needs:
       - async
-      - sync
+      - full
       - build
       - clippy
       - rustfmt
