@@ -19,12 +19,13 @@ Golang like WaitGroup implementation for sync/async Rust.
 ## Installation
 ```toml
 [dependencies]
-wg = "0.4"
+wg = "0.5"
 ```
 
 ## Example
 
 ### Sync
+
 ```rust
 use wg::WaitGroup;
 use std::sync::Arc;
@@ -86,8 +87,8 @@ async fn main() {
 ```
 
 ## Acknowledgements
-- Inspired by Golang sync.WaitGroup, [ibraheemdev's `AwaitGroup`] and [`crossbeam_utils::WaitGroup`]. 
 
+- Inspired by Golang sync.WaitGroup, [ibraheemdev's `AwaitGroup`] and [`crossbeam_utils::WaitGroup`]. 
 
 ## License
 
@@ -95,8 +96,6 @@ async fn main() {
 Licensed under either of <a href="https://opensource.org/licenses/Apache-2.0">Apache License, Version
 2.0</a> or <a href="https://opensource.org/licenses/MIT">MIT license</a> at your option.
 </sup>
-
-<br>
 
 <sub>
 Unless you explicitly state otherwise, any contribution intentionally submitted
@@ -111,8 +110,3 @@ shall be dual licensed as above, without any additional terms or conditions.
 [doc-url]: https://docs.rs/wg
 [crates-url]: https://crates.io/crates/wg
 [codecov-url]: https://app.codecov.io/gh/al8n/wg/
-[license-url]: https://opensource.org/licenses/Apache-2.0
-[rustc-url]: https://github.com/rust-lang/rust/blob/master/RELEASES.md
-[license-apache-url]: https://opensource.org/licenses/Apache-2.0
-[license-mit-url]: https://opensource.org/licenses/MIT
-[rustc-image]: https://img.shields.io/badge/rustc-1.56.0%2B-orange.svg?style=for-the-badge&logo=Rust

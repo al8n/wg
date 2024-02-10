@@ -371,23 +371,20 @@ impl WaitGroup {
     }
 }
 
-#[cfg(feature = "atomic-waker")]
 pub use r#async::*;
 
-#[cfg(feature = "atomic-waker")]
 mod r#async {
     use super::*;
-    use atomic_waker::AtomicWaker;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use std::{
         future::Future,
         pin::Pin,
-        task::{Context, Poll},
+        task::{Context, Poll, Waker},
     };
 
     struct AsyncInner {
-        waker: AtomicWaker,
+        waker: Mutex<Option<Waker>>,
         count: AtomicUsize,
     }
 
@@ -442,7 +439,7 @@ mod r#async {
             Self {
                 inner: Arc::new(AsyncInner {
                     count: AtomicUsize::new(0),
-                    waker: AtomicWaker::new(),
+                    waker: Mutex::new(None),
                 }),
             }
         }
@@ -453,7 +450,7 @@ mod r#async {
             Self {
                 inner: Arc::new(AsyncInner {
                     count: AtomicUsize::new(count),
-                    waker: AtomicWaker::new(),
+                    waker: Mutex::new(None),
                 }),
             }
         }
@@ -542,22 +539,11 @@ mod r#async {
         /// }
         /// ```
         pub fn done(&self) {
-            let res = self
-                .inner
-                .count
-                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |val| {
-                    // We are the last worker
-                    if val == 1 {
-                        Some(0)
-                    } else if val == 0 {
-                        None
-                    } else {
-                        Some(val - 1)
-                    }
-                });
-            if let Ok(count) = res {
-                if count == 1 {
-                    self.inner.waker.wake();
+            let count = self.inner.count.fetch_sub(1, Ordering::Relaxed);
+            // We are the last worker
+            if count == 1 {
+                if let Some(waker) = self.inner.waker.lock_me().take() {
+                    waker.wake();
                 }
             }
         }
@@ -643,12 +629,16 @@ mod r#async {
         type Output = ();
 
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            match self.inner.count.load(Ordering::Acquire) {
+            if self.inner.count.load(Ordering::Relaxed) == 0 {
+                return Poll::Ready(());
+            }
+
+            let waker = cx.waker().clone();
+            *self.inner.waker.lock_me() = Some(waker);
+
+            match self.inner.count.load(Ordering::Relaxed) {
                 0 => Poll::Ready(()),
-                _ => {
-                    self.inner.waker.register(cx.waker());
-                    Poll::Pending
-                }
+                _ => Poll::Pending,
             }
         }
     }
@@ -772,9 +762,7 @@ mod r#async {
         #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
         async fn test_async_block_wait() {
             let wg = AsyncWaitGroup::new();
-            wg.add(1);
-            let t_wg = wg.clone();
-
+            let t_wg = wg.add(1);
             tokio::spawn(async move {
                 // do some time consuming task
                 t_wg.done()
