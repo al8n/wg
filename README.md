@@ -17,10 +17,24 @@ Golang like WaitGroup implementation for sync/async Rust.
 </div>
 
 ## Installation
+
+By default, blocking version `WaitGroup` is enabled, if you want to use non-blocking `AsyncWaitGroup`, you need to
+enbale `future` feature in your `Cargo.toml`.
+
+### Sync
+
 ```toml
 [dependencies]
-wg = "0.5"
+wg = "0.6"
 ```
+
+### Async
+
+```toml
+[dependencies]
+wg = { version: "0.6", features = ["future"] }
+```
+
 
 ## Example
 

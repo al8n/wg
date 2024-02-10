@@ -371,21 +371,25 @@ impl WaitGroup {
     }
 }
 
+#[cfg(feature = "future")]
 pub use r#async::*;
 
+#[cfg(feature = "future")]
 mod r#async {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use event_listener::{Event, EventListener};
+    use event_listener_strategy::{easy_wrapper, EventListenerFuture, Strategy};
 
     use std::{
-        future::Future,
         pin::Pin,
-        task::{Context, Poll, Waker},
+        sync::atomic::{AtomicUsize, Ordering},
+        task::Poll,
     };
 
+    #[derive(Debug)]
     struct AsyncInner {
-        waker: Mutex<Option<Waker>>,
-        count: AtomicUsize,
+        counter: AtomicUsize,
+        event: Event,
     }
 
     /// An AsyncWaitGroup waits for a collection of threads to finish.
@@ -429,7 +433,7 @@ mod r#async {
     ///
     /// [`wait`]: struct.AsyncWaitGroup.html#method.wait
     /// [`add`]: struct.AsyncWaitGroup.html#method.add
-    #[cfg_attr(docsrs, doc(cfg(feature = "test")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "future")))]
     pub struct AsyncWaitGroup {
         inner: Arc<AsyncInner>,
     }
@@ -438,8 +442,8 @@ mod r#async {
         fn default() -> Self {
             Self {
                 inner: Arc::new(AsyncInner {
-                    count: AtomicUsize::new(0),
-                    waker: Mutex::new(None),
+                    counter: AtomicUsize::new(0),
+                    event: Event::new(),
                 }),
             }
         }
@@ -449,8 +453,8 @@ mod r#async {
         fn from(count: usize) -> Self {
             Self {
                 inner: Arc::new(AsyncInner {
-                    count: AtomicUsize::new(count),
-                    waker: Mutex::new(None),
+                    counter: AtomicUsize::new(count),
+                    event: Event::new(),
                 }),
             }
         }
@@ -466,10 +470,8 @@ mod r#async {
 
     impl std::fmt::Debug for AsyncWaitGroup {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let count = self.inner.count.load(Ordering::Relaxed);
-
             f.debug_struct("AsyncWaitGroup")
-                .field("count", &count)
+                .field("counter", &self.inner.counter)
                 .finish()
         }
     }
@@ -513,7 +515,7 @@ mod r#async {
         ///
         /// [`wait`]: struct.AsyncWaitGroup.html#method.wait
         pub fn add(&self, num: usize) -> Self {
-            self.inner.count.fetch_add(num, Ordering::SeqCst);
+            self.inner.counter.fetch_add(num, Ordering::AcqRel);
 
             Self {
                 inner: self.inner.clone(),
@@ -539,18 +541,14 @@ mod r#async {
         /// }
         /// ```
         pub fn done(&self) {
-            let count = self.inner.count.fetch_sub(1, Ordering::Relaxed);
-            // We are the last worker
-            if count == 1 {
-                if let Some(waker) = self.inner.waker.lock_me().take() {
-                    waker.wake();
-                }
+            if self.inner.counter.fetch_sub(1, Ordering::SeqCst) == 1 {
+                self.inner.event.notify(usize::MAX);
             }
         }
 
         /// waitings return how many jobs are waiting.
         pub fn waitings(&self) -> usize {
-            self.inner.count.load(Ordering::Acquire)
+            self.inner.counter.load(Ordering::Acquire)
         }
 
         /// wait blocks until the [`AsyncWaitGroup`] counter is zero.
@@ -575,8 +573,8 @@ mod r#async {
         ///     wg.wait().await;
         /// }
         /// ```
-        pub async fn wait(&self) {
-            WaitGroupFuture::new(&self.inner).await
+        pub fn wait(&self) -> WaitGroupFuture<'_> {
+            WaitGroupFuture::_new(WaitGroupFutureInner::new(&self.inner))
         }
 
         /// Wait blocks until the [`AsyncWaitGroup`] counter is zero. This method is
@@ -606,39 +604,67 @@ mod r#async {
         /// }
         /// ```
         pub fn block_wait(&self) {
-            loop {
-                match self.inner.count.load(Ordering::Acquire) {
-                    0 => return,
-                    _ => core::hint::spin_loop(),
-                }
+            WaitGroupFutureInner::new(&self.inner).wait();
+        }
+    }
+
+    easy_wrapper! {
+        /// A future returned by [`AsyncWaitGroup::wait()`].
+        #[derive(Debug)]
+        #[must_use = "futures do nothing unless you `.await` or poll them"]
+        #[cfg_attr(docsrs, doc(cfg(feature = "future")))]
+        pub struct WaitGroupFuture<'a>(WaitGroupFutureInner<'a> => ());
+
+        #[cfg(all(feature = "std", not(target_family = "wasm")))]
+        pub(crate) wait();
+    }
+
+    pin_project_lite::pin_project! {
+        /// A future that used to wait for the [`AsyncWaitGroup`] counter is zero.
+        #[must_use = "futures do nothing unless you `.await` or poll them"]
+        #[project(!Unpin)]
+        #[derive(Debug)]
+        struct WaitGroupFutureInner<'a> {
+            inner: &'a Arc<AsyncInner>,
+            listener: Option<EventListener>,
+            #[pin]
+            _pin: std::marker::PhantomPinned,
+        }
+    }
+
+    impl<'a> WaitGroupFutureInner<'a> {
+        fn new(inner: &'a Arc<AsyncInner>) -> Self {
+            Self {
+                inner,
+                listener: None,
+                _pin: std::marker::PhantomPinned,
             }
         }
     }
 
-    struct WaitGroupFuture<'a> {
-        inner: &'a Arc<AsyncInner>,
-    }
-
-    impl<'a> WaitGroupFuture<'a> {
-        fn new(inner: &'a Arc<AsyncInner>) -> Self {
-            Self { inner }
-        }
-    }
-
-    impl Future for WaitGroupFuture<'_> {
+    impl EventListenerFuture for WaitGroupFutureInner<'_> {
         type Output = ();
 
-        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            if self.inner.count.load(Ordering::Relaxed) == 0 {
-                return Poll::Ready(());
-            }
+        fn poll_with_strategy<'a, S: Strategy<'a>>(
+            self: Pin<&mut Self>,
+            strategy: &mut S,
+            context: &mut S::Context,
+        ) -> Poll<Self::Output> {
+            let this = self.project();
+            loop {
+                if this.inner.counter.load(Ordering::Acquire) == 0 {
+                    return Poll::Ready(());
+                }
 
-            let waker = cx.waker().clone();
-            *self.inner.waker.lock_me() = Some(waker);
-
-            match self.inner.count.load(Ordering::Relaxed) {
-                0 => Poll::Ready(()),
-                _ => Poll::Pending,
+                if this.listener.is_some() {
+                    // Poll using the given strategy
+                    match S::poll(strategy, &mut *this.listener, context) {
+                        Poll::Ready(_) => {}
+                        Poll::Pending => return Poll::Pending,
+                    }
+                } else {
+                    *this.listener = Some(this.inner.event.listen());
+                }
             }
         }
     }
@@ -759,13 +785,13 @@ mod r#async {
             assert_eq!(wg.waitings(), 2);
         }
 
-        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-        async fn test_async_block_wait() {
+        #[test]
+        fn test_async_block_wait() {
             let wg = AsyncWaitGroup::new();
             let t_wg = wg.add(1);
-            tokio::spawn(async move {
+            std::thread::spawn(move || {
                 // do some time consuming task
-                t_wg.done()
+                t_wg.done();
             });
 
             // wait other thread completes
