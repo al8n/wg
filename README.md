@@ -16,27 +16,41 @@ Golang like WaitGroup implementation for sync/async Rust.
 <img alt="license" src="https://img.shields.io/badge/License-Apache%202.0/MIT-blue.svg?style=for-the-badge&fontColor=white&logoColor=f5c076&logo=data:image/svg+xml;base64,PCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj4KDTwhLS0gVXBsb2FkZWQgdG86IFNWRyBSZXBvLCB3d3cuc3ZncmVwby5jb20sIFRyYW5zZm9ybWVkIGJ5OiBTVkcgUmVwbyBNaXhlciBUb29scyAtLT4KPHN2ZyBmaWxsPSIjZmZmZmZmIiBoZWlnaHQ9IjgwMHB4IiB3aWR0aD0iODAwcHgiIHZlcnNpb249IjEuMSIgaWQ9IkNhcGFfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmlld0JveD0iMCAwIDI3Ni43MTUgMjc2LjcxNSIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSIgc3Ryb2tlPSIjZmZmZmZmIj4KDTxnIGlkPSJTVkdSZXBvX2JnQ2FycmllciIgc3Ryb2tlLXdpZHRoPSIwIi8+Cg08ZyBpZD0iU1ZHUmVwb190cmFjZXJDYXJyaWVyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KDTxnIGlkPSJTVkdSZXBvX2ljb25DYXJyaWVyIj4gPGc+IDxwYXRoIGQ9Ik0xMzguMzU3LDBDNjIuMDY2LDAsMCw2Mi4wNjYsMCwxMzguMzU3czYyLjA2NiwxMzguMzU3LDEzOC4zNTcsMTM4LjM1N3MxMzguMzU3LTYyLjA2NiwxMzguMzU3LTEzOC4zNTcgUzIxNC42NDgsMCwxMzguMzU3LDB6IE0xMzguMzU3LDI1OC43MTVDNzEuOTkyLDI1OC43MTUsMTgsMjA0LjcyMywxOCwxMzguMzU3UzcxLjk5MiwxOCwxMzguMzU3LDE4IHMxMjAuMzU3LDUzLjk5MiwxMjAuMzU3LDEyMC4zNTdTMjA0LjcyMywyNTguNzE1LDEzOC4zNTcsMjU4LjcxNXoiLz4gPHBhdGggZD0iTTE5NC43OTgsMTYwLjkwM2MtNC4xODgtMi42NzctOS43NTMtMS40NTQtMTIuNDMyLDIuNzMyYy04LjY5NCwxMy41OTMtMjMuNTAzLDIxLjcwOC0zOS42MTQsMjEuNzA4IGMtMjUuOTA4LDAtNDYuOTg1LTIxLjA3OC00Ni45ODUtNDYuOTg2czIxLjA3Ny00Ni45ODYsNDYuOTg1LTQ2Ljk4NmMxNS42MzMsMCwzMC4yLDcuNzQ3LDM4Ljk2OCwyMC43MjMgYzIuNzgyLDQuMTE3LDguMzc1LDUuMjAxLDEyLjQ5NiwyLjQxOGM0LjExOC0yLjc4Miw1LjIwMS04LjM3NywyLjQxOC0xMi40OTZjLTEyLjExOC0xNy45MzctMzIuMjYyLTI4LjY0NS01My44ODItMjguNjQ1IGMtMzUuODMzLDAtNjQuOTg1LDI5LjE1Mi02NC45ODUsNjQuOTg2czI5LjE1Miw2NC45ODYsNjQuOTg1LDY0Ljk4NmMyMi4yODEsMCw0Mi43NTktMTEuMjE4LDU0Ljc3OC0zMC4wMDkgQzIwMC4yMDgsMTY5LjE0NywxOTguOTg1LDE2My41ODIsMTk0Ljc5OCwxNjAuOTAzeiIvPiA8L2c+IDwvZz4KDTwvc3ZnPg==" height="22">
 </div>
 
-## Installation
+## Introduction
 
-By default, blocking version `WaitGroup` is enabled, if you want to use non-blocking `AsyncWaitGroup`, you need to
-enbale `future` feature in your `Cargo.toml`.
+By default, blocking version `WaitGroup` is enabled.
+
+If you are using `tokio`, you need to enable `tokio` feature in your `Cargo.toml` and use `wg::tokio::AsyncWaitGroup`.
+
+If you are using other async runtime, you need to
+enbale `future` feature in your `Cargo.toml` and use `wg::future::AsyncWaitGroup`.
 
 ### Sync
 
 ```toml
 [dependencies]
-wg = "0.6"
+wg = "0.7"
 ```
 
-### Async
+### `tokio`
+
+An async implementation for `tokio` runtime.
 
 ```toml
 [dependencies]
-wg = { version: "0.6", features = ["future"] }
+wg = { version: "0.7", features = ["tokio"] }
 ```
 
+### `future`
 
-## Example
+A more generic async implementation.
+
+```toml
+[dependencies]
+wg = { version: "0.7", features = ["future"] }
+```
+
+## Instruction
 
 ### Sync
 
@@ -69,10 +83,10 @@ fn main() {
 }
 ```
 
-### Async
+### `tokio`
 
 ```rust
-use wg::AsyncWaitGroup;
+use wg::tokio::AsyncWaitGroup;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::{spawn, time::{sleep, Duration}};
@@ -100,9 +114,42 @@ async fn main() {
 }
 ```
 
+### `async-io`
+
+```rust
+use wg::future::AsyncWaitGroup;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
+use async_std::task::{spawn, block_on, sleep};
+
+fn main() {
+    block_on(async {
+        let wg = AsyncWaitGroup::new();
+        let ctr = Arc::new(AtomicUsize::new(0));
+
+        for _ in 0..5 {
+            let ctrx = ctr.clone();
+            let t_wg = wg.add(1);
+            spawn(async move {
+                // mock some time consuming task
+                sleep(Duration::from_millis(50)).await;
+                ctrx.fetch_add(1, Ordering::Relaxed);
+
+                // mock task is finished
+                t_wg.done();
+            });
+        }
+
+        wg.wait().await;
+        assert_eq!(ctr.load(Ordering::Relaxed), 5);
+    });
+}
+```
+
 ## Acknowledgements
 
-- Inspired by Golang sync.WaitGroup, [ibraheemdev's `AwaitGroup`] and [`crossbeam_utils::WaitGroup`]. 
+- Inspired by Golang sync.WaitGroup and [`crossbeam_utils::WaitGroup`].
 
 ## License
 

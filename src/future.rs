@@ -25,32 +25,32 @@ struct AsyncInner {
 /// # Example
 ///
 /// ```rust
-/// use wg::AsyncWaitGroup;
+/// use wg::future::AsyncWaitGroup;
 /// use std::sync::Arc;
 /// use std::sync::atomic::{AtomicUsize, Ordering};
-/// use tokio::{spawn, time::{sleep, Duration}};
+/// use std::time::Duration;
+/// use async_std::task::{spawn, sleep};
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let wg = AsyncWaitGroup::new();
-///     let ctr = Arc::new(AtomicUsize::new(0));
+/// # async_std::task::block_on(async {
+/// let wg = AsyncWaitGroup::new();
+/// let ctr = Arc::new(AtomicUsize::new(0));
 ///
-///     for _ in 0..5 {
-///         let ctrx = ctr.clone();
-///         let t_wg = wg.add(1);
-///         spawn(async move {
-///             // mock some time consuming task
-///             sleep(Duration::from_millis(50)).await;
-///             ctrx.fetch_add(1, Ordering::Relaxed);
+/// for _ in 0..5 {
+///     let ctrx = ctr.clone();
+///     let t_wg = wg.add(1);
+///     spawn(async move {
+///         // mock some time consuming task
+///         sleep(Duration::from_millis(50)).await;
+///         ctrx.fetch_add(1, Ordering::Relaxed);
 ///
-///             // mock task is finished
-///             t_wg.done();
-///         });
-///     }
-///
-///     wg.wait().await;
-///     assert_eq!(ctr.load(Ordering::Relaxed), 5);
+///         // mock task is finished
+///         t_wg.done();
+///     });
 /// }
+///
+/// wg.wait().await;
+/// assert_eq!(ctr.load(Ordering::Relaxed), 5);
+/// # })
 /// ```
 ///
 /// [`wait`]: struct.AsyncWaitGroup.html#method.wait
@@ -115,24 +115,25 @@ impl AsyncWaitGroup {
     /// new `add` calls must happen after all previous [`wait`] calls have returned.
     ///
     /// # Example
+    /// 
     /// ```rust
-    /// use wg::AsyncWaitGroup;
+    /// use wg::future::AsyncWaitGroup;
+    /// use async_std::task::spawn;
+    /// 
+    /// # async_std::task::block_on(async {
+    /// let wg = AsyncWaitGroup::new();
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let wg = AsyncWaitGroup::new();
-    ///
-    ///     wg.add(3);
-    ///     (0..3).for_each(|_| {
-    ///         let t_wg = wg.clone();
-    ///         tokio::spawn(async move {
-    ///             // do some time consuming work
-    ///             t_wg.done();
-    ///         });
+    /// wg.add(3);
+    /// (0..3).for_each(|_| {
+    ///     let t_wg = wg.clone();
+    ///     spawn(async move {
+    ///         // do some time consuming work
+    ///         t_wg.done();
     ///     });
+    /// });
     ///
-    ///     wg.wait().await;
-    /// }
+    /// wg.wait().await;
+    /// # })
     /// ```
     ///
     /// [`wait`]: struct.AsyncWaitGroup.html#method.wait
@@ -149,18 +150,18 @@ impl AsyncWaitGroup {
     /// # Example
     ///
     /// ```rust
-    /// use wg::AsyncWaitGroup;
+    /// use wg::future::AsyncWaitGroup;
+    /// use async_std::task::spawn;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
+    /// # async_std::task::block_on(async {
     ///     let wg = AsyncWaitGroup::new();
     ///     wg.add(1);
     ///     let t_wg = wg.clone();
-    ///     tokio::spawn(async move {
+    ///     spawn(async move {
     ///         // do some time consuming task
     ///         t_wg.done();
     ///     });
-    /// }
+    /// # })
     /// ```
     pub fn done(&self) {
         if self.inner.counter.fetch_sub(1, Ordering::SeqCst) == 1 {
@@ -178,22 +179,22 @@ impl AsyncWaitGroup {
     /// # Example
     ///
     /// ```rust
-    /// use wg::AsyncWaitGroup;
+    /// use wg::future::AsyncWaitGroup;
+    /// use async_std::task::spawn;
+    /// 
+    /// # async_std::task::block_on(async {
+    /// let wg = AsyncWaitGroup::new();
+    /// wg.add(1);
+    /// let t_wg = wg.clone();
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let wg = AsyncWaitGroup::new();
-    ///     wg.add(1);
-    ///     let t_wg = wg.clone();
+    /// spawn(async move {
+    ///     // do some time consuming task
+    ///     t_wg.done()
+    /// });
     ///
-    ///     tokio::spawn( async move {
-    ///         // do some time consuming task
-    ///         t_wg.done()
-    ///     });
-    ///
-    ///     // wait other thread completes
-    ///     wg.wait().await;
-    /// }
+    /// // wait other thread completes
+    /// wg.wait().await;
+    /// # })
     /// ```
     pub fn wait(&self) -> WaitGroupFuture<'_> {
         WaitGroupFuture::_new(WaitGroupFutureInner::new(&self.inner))
@@ -208,22 +209,22 @@ impl AsyncWaitGroup {
     /// # Example
     ///
     /// ```rust
-    /// use wg::AsyncWaitGroup;
+    /// use wg::future::AsyncWaitGroup;
+    /// use async_std::task::spawn;
+    /// 
+    /// # async_std::task::block_on(async {
+    /// let wg = AsyncWaitGroup::new();
+    /// wg.add(1);
+    /// let t_wg = wg.clone();
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let wg = AsyncWaitGroup::new();
-    ///     wg.add(1);
-    ///     let t_wg = wg.clone();
+    /// spawn(async move {
+    ///     // do some time consuming task
+    ///     t_wg.done()
+    /// });
     ///
-    ///     tokio::spawn( async move {
-    ///         // do some time consuming task
-    ///         t_wg.done()
-    ///     });
-    ///
-    ///     // wait other thread completes
-    ///     wg.block_wait();
-    /// }
+    /// // wait other thread completes
+    /// wg.block_wait();
+    /// # })
     /// ```
     pub fn block_wait(&self) {
         WaitGroupFutureInner::new(&self.inner).wait();
@@ -296,164 +297,5 @@ impl EventListenerFuture for WaitGroupFutureInner<'_> {
                 *this.listener = Some(this.inner.event.listen());
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::time::Duration;
-
-    #[tokio::test]
-    async fn test_async_wait_group() {
-        let wg = AsyncWaitGroup::new();
-        let ctr = Arc::new(AtomicUsize::new(0));
-
-        for _ in 0..5 {
-            let ctrx = ctr.clone();
-            let wg = wg.add(1);
-
-            tokio::spawn(async move {
-                tokio::time::sleep(Duration::from_millis(50)).await;
-                ctrx.fetch_add(1, Ordering::Relaxed);
-                wg.done();
-            });
-        }
-        wg.wait().await;
-        assert_eq!(ctr.load(Ordering::Relaxed), 5);
-    }
-
-    #[tokio::test]
-    async fn test_async_wait_group_reuse() {
-        let wg = AsyncWaitGroup::new();
-        let ctr = Arc::new(AtomicUsize::new(0));
-        for _ in 0..6 {
-            let wg = wg.add(1);
-            let ctrx = ctr.clone();
-            tokio::spawn(async move {
-                tokio::time::sleep(Duration::from_millis(5)).await;
-                ctrx.fetch_add(1, Ordering::Relaxed);
-                wg.done();
-            });
-        }
-
-        wg.wait().await;
-        assert_eq!(ctr.load(Ordering::Relaxed), 6);
-
-        let worker = wg.add(1);
-
-        let ctrx = ctr.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(5)).await;
-            ctrx.fetch_add(1, Ordering::Relaxed);
-            worker.done();
-        });
-
-        wg.wait().await;
-        assert_eq!(ctr.load(Ordering::Relaxed), 7);
-    }
-
-    #[tokio::test]
-    async fn test_async_wait_group_nested() {
-        let wg = AsyncWaitGroup::new();
-        let ctr = Arc::new(AtomicUsize::new(0));
-        for _ in 0..5 {
-            let worker = wg.add(1);
-            let ctrx = ctr.clone();
-            tokio::spawn(async move {
-                let nested_worker = worker.add(1);
-                let ctrxx = ctrx.clone();
-                tokio::spawn(async move {
-                    ctrxx.fetch_add(1, Ordering::Relaxed);
-                    nested_worker.done();
-                });
-                ctrx.fetch_add(1, Ordering::Relaxed);
-                worker.done();
-            });
-        }
-
-        wg.wait().await;
-        assert_eq!(ctr.load(Ordering::Relaxed), 10);
-    }
-
-    #[tokio::test]
-    async fn test_async_wait_group_from() {
-        let wg = AsyncWaitGroup::from(5);
-        for _ in 0..5 {
-            let t = wg.clone();
-            tokio::spawn(async move {
-                t.done();
-            });
-        }
-        wg.wait().await;
-    }
-
-    #[tokio::test]
-    async fn test_sync_wait_group() {
-        let wg = AsyncWaitGroup::new();
-        let ctr = Arc::new(AtomicUsize::new(0));
-
-        for _ in 0..5 {
-            let ctrx = ctr.clone();
-            let wg = wg.add(1);
-            std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(50));
-                ctrx.fetch_add(1, Ordering::Relaxed);
-
-                wg.done();
-            });
-        }
-        wg.wait().await;
-        assert_eq!(ctr.load(Ordering::Relaxed), 5);
-    }
-
-    #[tokio::test]
-    async fn test_async_waitings() {
-        let wg = AsyncWaitGroup::new();
-        wg.add(1);
-        wg.add(1);
-        assert_eq!(wg.waitings(), 2);
-    }
-
-    #[test]
-    fn test_async_block_wait() {
-        let wg = AsyncWaitGroup::new();
-        let t_wg = wg.add(1);
-        std::thread::spawn(move || {
-            // do some time consuming task
-            t_wg.done();
-        });
-
-        // wait other thread completes
-        wg.block_wait();
-
-        assert_eq!(wg.waitings(), 0);
-    }
-
-    #[tokio::test]
-    async fn test_wake_after_updating() {
-        let wg = AsyncWaitGroup::new();
-        for _ in 0..100000 {
-            let worker = wg.add(1);
-            tokio::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                let mut a = 0;
-                for _ in 0..1000 {
-                    a += 1;
-                }
-                println!("{a}");
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                worker.done();
-            });
-        }
-        wg.wait().await;
-    }
-
-    #[test]
-    fn test_clone_and_fmt() {
-        let awg = AsyncWaitGroup::new();
-        let awg1 = awg.clone();
-        awg1.add(3);
-        assert_eq!(format!("{:?}", awg), format!("{:?}", awg1));
     }
 }

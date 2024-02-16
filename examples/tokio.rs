@@ -4,9 +4,9 @@ use tokio::{
     spawn,
     time::{sleep, Duration},
 };
-use wg::AsyncWaitGroup;
+use wg::tokio::AsyncWaitGroup;
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
+#[tokio::main]
 async fn main() {
     let wg = AsyncWaitGroup::new();
     let ctr = Arc::new(AtomicUsize::new(0));

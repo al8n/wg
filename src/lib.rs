@@ -22,10 +22,17 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(docsrs, allow(unused_attributes))]
 
+/// [`AsyncWaitGroup`] for `futures`.
 #[cfg(feature = "future")]
-mod future;
-#[cfg(feature = "future")]
-pub use future::*;
+#[cfg_attr(docsrs, doc(cfg(feature = "future")))]
+pub mod future;
+// #[cfg(feature = "future")]
+// pub use future::*;
+
+/// [`AsyncWaitGroup`] for `tokio` runtime.
+#[cfg(feature = "tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+pub mod tokio;
 
 trait Mu {
     type Guard<'a>
