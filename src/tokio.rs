@@ -55,7 +55,6 @@ struct AsyncInner {
 ///
 /// [`wait`]: struct.AsyncWaitGroup.html#method.wait
 /// [`add`]: struct.AsyncWaitGroup.html#method.add
-#[cfg_attr(docsrs, doc(cfg(feature = "future")))]
 pub struct AsyncWaitGroup {
     inner: Arc<AsyncInner>,
 }
