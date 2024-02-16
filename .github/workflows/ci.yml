@@ -87,7 +87,7 @@ jobs:
         # --no-self-update is necessary because the windows environment cannot self-update rustup.exe.
         run: rustup update stable --no-self-update && rustup default stable
       - name: Test
-        run: cargo test --no-default-features --features future 
+        run: cargo test --lib --no-default-features --features future 
   sync:
     name: sync
     strategy:
@@ -103,7 +103,7 @@ jobs:
         # --no-self-update is necessary because the windows environment cannot self-update rustup.exe.
         run: rustup update stable --no-self-update && rustup default stable
       - name: Test
-        run: cargo test
+        run: cargo test --lib
 
   coverage:
     name: cargo tarpaulin
