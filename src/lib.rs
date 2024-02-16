@@ -25,7 +25,7 @@
 #[cfg(feature = "future")]
 mod future;
 #[cfg(feature = "future")]
-pub use future::AsyncWaitGroup;
+pub use future::*;
 
 trait Mu {
     type Guard<'a>
