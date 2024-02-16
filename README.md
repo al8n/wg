@@ -77,7 +77,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::{spawn, time::{sleep, Duration}};
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
+#[tokio::main]
 async fn main() {
     let wg = AsyncWaitGroup::new();
     let ctr = Arc::new(AtomicUsize::new(0));
