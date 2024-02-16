@@ -115,11 +115,11 @@ impl AsyncWaitGroup {
     /// new `add` calls must happen after all previous [`wait`] calls have returned.
     ///
     /// # Example
-    /// 
+    ///
     /// ```rust
     /// use wg::future::AsyncWaitGroup;
     /// use async_std::task::spawn;
-    /// 
+    ///
     /// # async_std::task::block_on(async {
     /// let wg = AsyncWaitGroup::new();
     ///
@@ -181,7 +181,7 @@ impl AsyncWaitGroup {
     /// ```rust
     /// use wg::future::AsyncWaitGroup;
     /// use async_std::task::spawn;
-    /// 
+    ///
     /// # async_std::task::block_on(async {
     /// let wg = AsyncWaitGroup::new();
     /// wg.add(1);
@@ -211,7 +211,7 @@ impl AsyncWaitGroup {
     /// ```rust
     /// use wg::future::AsyncWaitGroup;
     /// use async_std::task::spawn;
-    /// 
+    ///
     /// # async_std::task::block_on(async {
     /// let wg = AsyncWaitGroup::new();
     /// wg.add(1);

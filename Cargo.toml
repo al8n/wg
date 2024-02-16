@@ -6,7 +6,7 @@ homepage = "https://github.com/al8n/wg"
 repository = "https://github.com/al8n/wg.git"
 documentation = "https://docs.rs/wg/"
 readme = "README.md"
-version = "0.7.0"
+version = "0.7.1"
 license = "MIT OR Apache-2.0"
 keywords = ["waitgroup", "async", "sync", "notify", "wake"]
 categories = ["asynchronous", "concurrency", "data-structures"]
@@ -20,7 +20,7 @@ parking_lot = ["dep:parking_lot"]
 
 future = ["event-listener", "event-listener-strategy", "pin-project-lite"]
 
-tokio = ["dep:tokio", "futures-core"]
+tokio = ["dep:tokio", "futures-core", "pin-project-lite"]
 
 [dependencies]
 parking_lot = { version = "0.12", optional = true }
