@@ -1,11 +1,10 @@
 use super::*;
 use event_listener::{Event, EventListener};
-use event_listener_strategy::{easy_wrapper, EventListenerFuture, Strategy};
 
 use std::{
     pin::Pin,
     sync::atomic::{AtomicUsize, Ordering},
-    task::Poll,
+    task::{Context, Poll},
 };
 
 #[derive(Debug)]
@@ -163,7 +162,7 @@ impl AsyncWaitGroup {
     ///     });
     /// # })
     /// ```
-    pub fn done(&self) {
+    pub fn done(self) {
         if self.inner.counter.fetch_sub(1, Ordering::SeqCst) == 1 {
             self.inner.event.notify(usize::MAX);
         }
@@ -197,7 +196,11 @@ impl AsyncWaitGroup {
     /// # })
     /// ```
     pub fn wait(&self) -> WaitGroupFuture<'_> {
-        WaitGroupFuture::_new(WaitGroupFutureInner::new(&self.inner))
+        WaitGroupFuture {
+            inner: self,
+            notified: self.inner.event.listen(),
+            _pin: std::marker::PhantomPinned,
+        }
     }
 
     /// Wait blocks until the [`AsyncWaitGroup`] counter is zero. This method is
@@ -222,79 +225,64 @@ impl AsyncWaitGroup {
     ///     t_wg.done()
     /// });
     ///
+    /// let spawner = |fut| {
+    ///     spawn(fut);
+    /// };
+    ///
     /// // wait other thread completes
-    /// wg.block_wait();
+    /// wg.block_wait(spawner);
     /// # })
     /// ```
-    pub fn block_wait(&self) {
-        WaitGroupFutureInner::new(&self.inner).wait();
+    pub fn block_wait<S>(&self, spawner: S)
+    where
+        S: FnOnce(Pin<Box<dyn std::future::Future<Output = ()> + Send + 'static>>),
+    {
+        let this = self.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        spawner(Box::pin(async move {
+            this.wait().await;
+            let _ = tx.send(());
+        }));
+
+        let _ = rx.recv();
     }
 }
 
-easy_wrapper! {
+pin_project_lite::pin_project! {
     /// A future returned by [`AsyncWaitGroup::wait()`].
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    #[cfg_attr(docsrs, doc(cfg(feature = "future")))]
-    pub struct WaitGroupFuture<'a>(WaitGroupFutureInner<'a> => ());
-
-    #[cfg(all(feature = "std", not(target_family = "wasm")))]
-    pub(crate) wait();
-}
-
-pin_project_lite::pin_project! {
-    /// A future that used to wait for the [`AsyncWaitGroup`] counter is zero.
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    #[project(!Unpin)]
-    #[derive(Debug)]
-    struct WaitGroupFutureInner<'a> {
-        inner: &'a Arc<AsyncInner>,
-        listener: Option<EventListener>,
+    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+    pub struct WaitGroupFuture<'a> {
+        inner: &'a AsyncWaitGroup,
+        #[pin]
+        notified: EventListener,
         #[pin]
         _pin: std::marker::PhantomPinned,
     }
 }
 
-impl<'a> WaitGroupFutureInner<'a> {
-    fn new(inner: &'a Arc<AsyncInner>) -> Self {
-        Self {
-            inner,
-            listener: None,
-            _pin: std::marker::PhantomPinned,
-        }
-    }
-}
-
-impl EventListenerFuture for WaitGroupFutureInner<'_> {
+impl<'a> std::future::Future for WaitGroupFuture<'a> {
     type Output = ();
 
-    fn poll_with_strategy<'a, S: Strategy<'a>>(
-        self: Pin<&mut Self>,
-        strategy: &mut S,
-        context: &mut S::Context,
-    ) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.inner.inner.counter.load(Ordering::SeqCst) == 0 {
+            return Poll::Ready(());
+        }
+
         let this = self.project();
-        loop {
-            if this.inner.counter.load(Ordering::SeqCst) == 0 {
-                return Poll::Ready(());
+        match this.notified.poll(cx) {
+            Poll::Pending => {
+                cx.waker().wake_by_ref();
+                Poll::Pending
             }
-
-            if this.listener.is_some() {
-                // Poll using the given strategy
-                match S::poll(strategy, &mut *this.listener, context) {
-                    Poll::Ready(_) => {
-                        // Event received, check the condition again.
-                        if this.inner.counter.load(Ordering::SeqCst) == 0 {
-                            return Poll::Ready(());
-                        }
-
-                        // Event received but condition not met, reset listener.
-                        *this.listener = None;
-                    }
-                    Poll::Pending => return Poll::Pending,
+            Poll::Ready(_) => {
+                if this.inner.inner.counter.load(Ordering::SeqCst) == 0 {
+                    Poll::Ready(())
+                } else {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
                 }
-            } else {
-                *this.listener = Some(this.inner.event.listen());
             }
         }
     }

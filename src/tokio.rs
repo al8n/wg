@@ -161,7 +161,7 @@ impl AsyncWaitGroup {
     ///     });
     /// }
     /// ```
-    pub fn done(&self) {
+    pub fn done(self) {
         if self.inner.counter.fetch_sub(1, Ordering::SeqCst) == 1 {
             self.inner.notify.notify_waiters();
         }
@@ -261,6 +261,20 @@ impl<'a> Future for WaitGroupFuture<'a> {
             return Poll::Ready(());
         }
 
-        self.project().notified.poll(cx)
+        let this = self.project();
+        match this.notified.poll(cx) {
+            Poll::Pending => {
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+            Poll::Ready(_) => {
+                if this.inner.inner.counter.load(Ordering::SeqCst) == 0 {
+                    Poll::Ready(())
+                } else {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
+            }
+        }
     }
 }

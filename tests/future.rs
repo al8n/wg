@@ -127,9 +127,11 @@ fn test_async_block_wait() {
         // do some time consuming task
         t_wg.done();
     });
-
+    let spawner = |fut| {
+        async_std::task::spawn(fut);
+    };
     // wait other thread completes
-    wg.block_wait();
+    wg.block_wait(spawner);
 
     assert_eq!(wg.waitings(), 0);
 }
