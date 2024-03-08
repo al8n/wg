@@ -161,7 +161,7 @@ impl AsyncWaitGroup {
     ///     });
     /// }
     /// ```
-    pub fn done(self) {
+    pub fn done(&self) {
         if self.inner.counter.fetch_sub(1, Ordering::SeqCst) == 1 {
             self.inner.notify.notify_waiters();
         }

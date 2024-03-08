@@ -220,7 +220,7 @@ impl WaitGroup {
     /// });
     ///
     /// ```
-    pub fn done(self) {
+    pub fn done(&self) {
         let mut val = self.inner.count.lock_me();
 
         *val = if val.eq(&1) {
