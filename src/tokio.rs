@@ -1,12 +1,17 @@
-use super::*;
 use ::tokio::sync::{futures::Notified, Notify};
 
-use std::{
+use core::{
     future::Future,
     pin::Pin,
     sync::atomic::{AtomicUsize, Ordering},
     task::{Context, Poll},
 };
+
+#[cfg(feature = "std")]
+use std::sync::Arc;
+
+#[cfg(not(feature = "std"))]
+use alloc::sync::Arc;
 
 #[derive(Debug)]
 struct AsyncInner {
@@ -89,8 +94,8 @@ impl Clone for AsyncWaitGroup {
     }
 }
 
-impl std::fmt::Debug for AsyncWaitGroup {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for AsyncWaitGroup {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("AsyncWaitGroup")
             .field("counter", &self.inner.counter)
             .finish()
@@ -198,7 +203,7 @@ impl AsyncWaitGroup {
         WaitGroupFuture {
             inner: self,
             notified: self.inner.notify.notified(),
-            _pin: std::marker::PhantomPinned,
+            _pin: core::marker::PhantomPinned,
         }
     }
 
@@ -228,6 +233,8 @@ impl AsyncWaitGroup {
     ///     wg.block_wait();
     /// }
     /// ```
+    #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn block_wait(&self) {
         let this = self.clone();
         let (tx, rx) = std::sync::mpsc::channel();
@@ -249,7 +256,7 @@ pin_project_lite::pin_project! {
         #[pin]
         notified: Notified<'a>,
         #[pin]
-        _pin: std::marker::PhantomPinned,
+        _pin: core::marker::PhantomPinned,
     }
 }
 

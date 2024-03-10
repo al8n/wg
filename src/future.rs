@@ -1,11 +1,16 @@
-use super::*;
 use event_listener::{Event, EventListener};
 
-use std::{
+use core::{
     pin::Pin,
     sync::atomic::{AtomicUsize, Ordering},
     task::{Context, Poll},
 };
+
+#[cfg(feature = "std")]
+use std::sync::Arc;
+
+#[cfg(not(feature = "std"))]
+use alloc::sync::Arc;
 
 #[derive(Debug)]
 struct AsyncInner {
@@ -89,8 +94,8 @@ impl Clone for AsyncWaitGroup {
     }
 }
 
-impl std::fmt::Debug for AsyncWaitGroup {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for AsyncWaitGroup {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("AsyncWaitGroup")
             .field("counter", &self.inner.counter)
             .finish()
@@ -199,7 +204,7 @@ impl AsyncWaitGroup {
         WaitGroupFuture {
             inner: self,
             notified: self.inner.event.listen(),
-            _pin: std::marker::PhantomPinned,
+            _pin: core::marker::PhantomPinned,
         }
     }
 
@@ -233,9 +238,11 @@ impl AsyncWaitGroup {
     /// wg.block_wait(spawner);
     /// # })
     /// ```
+    #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn block_wait<S>(&self, spawner: S)
     where
-        S: FnOnce(Pin<Box<dyn std::future::Future<Output = ()> + Send + 'static>>),
+        S: FnOnce(Pin<Box<dyn core::future::Future<Output = ()> + Send + 'static>>),
     {
         let this = self.clone();
         let (tx, rx) = std::sync::mpsc::channel();
@@ -258,11 +265,11 @@ pin_project_lite::pin_project! {
         #[pin]
         notified: EventListener,
         #[pin]
-        _pin: std::marker::PhantomPinned,
+        _pin: core::marker::PhantomPinned,
     }
 }
 
-impl<'a> std::future::Future for WaitGroupFuture<'a> {
+impl<'a> core::future::Future for WaitGroupFuture<'a> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
