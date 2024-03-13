@@ -6,6 +6,17 @@ use core::{
     task::{Context, Poll},
 };
 
+pub use agnostic_lite::AsyncSpawner;
+
+#[cfg(feature = "smol")]
+pub use agnostic_lite::SmolSpawner;
+
+#[cfg(feature = "tokio")]
+pub use agnostic_lite::TokioSpawner;
+
+#[cfg(feature = "async-std")]
+pub use agnostic_lite::AsyncStdSpawner;
+
 #[cfg(feature = "std")]
 use std::sync::Arc;
 
@@ -217,7 +228,7 @@ impl AsyncWaitGroup {
     /// # Example
     ///
     /// ```rust
-    /// use wg::future::AsyncWaitGroup;
+    /// use wg::future::{AsyncWaitGroup, AsyncStdSpawner};
     /// use async_std::task::spawn;
     ///
     /// # async_std::task::block_on(async {
@@ -230,26 +241,23 @@ impl AsyncWaitGroup {
     ///     t_wg.done()
     /// });
     ///
-    /// let spawner = |fut| {
-    ///     spawn(fut);
-    /// };
-    ///
     /// // wait other thread completes
-    /// wg.block_wait(spawner);
+    /// wg.block_wait::<AsyncStdSpawner>();
     /// # })
     /// ```
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-    pub fn block_wait<S>(&self, spawner: S)
+    pub fn block_wait<S>(&self)
     where
-        S: FnOnce(Pin<Box<dyn core::future::Future<Output = ()> + Send + 'static>>),
+        S: agnostic_lite::AsyncSpawner,
     {
         let this = self.clone();
         let (tx, rx) = std::sync::mpsc::channel();
-        spawner(Box::pin(async move {
+
+        S::spawn_detach(async move {
             this.wait().await;
             let _ = tx.send(());
-        }));
+        });
 
         let _ = rx.recv();
     }
