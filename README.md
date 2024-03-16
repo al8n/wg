@@ -38,7 +38,7 @@ An async implementation for `tokio` runtime.
 
 ```toml
 [dependencies]
-wg = { version: "0.7", features = ["tokio"] }
+wg = { version = "0.7", features = ["tokio"] }
 ```
 
 ### `future`
@@ -47,7 +47,7 @@ A more generic async implementation.
 
 ```toml
 [dependencies]
-wg = { version: "0.7", features = ["future"] }
+wg = { version = "0.7", features = ["future"] }
 ```
 
 ## Instruction
