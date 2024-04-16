@@ -6,7 +6,7 @@ homepage = "https://github.com/al8n/wg"
 repository = "https://github.com/al8n/wg.git"
 documentation = "https://docs.rs/wg/"
 readme = "README.md"
-version = "0.8.1"
+version = "0.8.2"
 license = "MIT OR Apache-2.0"
 keywords = ["waitgroup", "async", "sync", "notify", "wake"]
 categories = ["asynchronous", "concurrency", "data-structures"]
@@ -31,7 +31,7 @@ pin-project-lite = { version = "0.2", optional = true }
 
 tokio = { version = "1", optional = true, default-features = false, features = ["sync"] }
 futures-core = { version = "0.3", default-features = false, optional = true }
-agnostic-lite = { version = "0.1", optional = true }
+agnostic-lite = { version = "0.3", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
