@@ -6,7 +6,7 @@ use core::{
     task::{Context, Poll},
 };
 
-pub use agnostic_lite::AsyncSpawner;
+pub use agnostic_lite::{AsyncSpawner, Detach};
 
 #[cfg(feature = "smol")]
 pub use agnostic_lite::smol::SmolSpawner;
