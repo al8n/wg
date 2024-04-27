@@ -87,10 +87,10 @@ jobs:
         # --no-self-update is necessary because the windows environment cannot self-update rustup.exe.
         run: rustup update stable --no-self-update && rustup default stable
       - name: Test
-        run: cargo test --lib --no-default-features --features future 
+        run: cargo test --lib --features future 
 
-  tokio:
-    name: tokio
+  no_std:
+    name: no_std
     strategy:
       matrix:
         os:
@@ -104,8 +104,23 @@ jobs:
         # --no-self-update is necessary because the windows environment cannot self-update rustup.exe.
         run: rustup update stable --no-self-update && rustup default stable
       - name: Test
-        run: cargo test --lib --no-default-features --features tokio
- 
+        run: cargo build --no-default-features --features alloc
+  no_std_and_future:
+    name: no_std & future
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        # --no-self-update is necessary because the windows environment cannot self-update rustup.exe.
+        run: rustup update stable --no-self-update && rustup default stable
+      - name: Test
+        run: cargo build --no-default-features --features alloc,future
   sync:
     name: sync
     strategy:
@@ -127,7 +142,7 @@ jobs:
     name: cargo tarpaulin
     runs-on: ubuntu-latest
     needs:
-      - tokio
+      - no_std
       - future
       - sync
       - build

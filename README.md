@@ -3,7 +3,7 @@
 </div>
 <div align="center">
 
-Golang like WaitGroup implementation for sync/async Rust.
+Golang like WaitGroup implementation for sync/async Rust, support `no_std` environment.
 
 [<img alt="github" src="https://img.shields.io/badge/GITHUB-al8n/wg-8da0cb?style=for-the-badge&logo=Github" height="22">][Github-url]
 [<img alt="Build" src="https://img.shields.io/github/actions/workflow/status/al8n/wg/ci.yml?logo=Github-Actions&style=for-the-badge" height="22">][CI-url]
@@ -20,37 +20,42 @@ Golang like WaitGroup implementation for sync/async Rust.
 
 By default, blocking version `WaitGroup` is enabled.
 
-If you are using `tokio`, you need to enable `tokio` feature in your `Cargo.toml` and use `wg::tokio::AsyncWaitGroup`.
-
 If you are using other async runtime, you need to
-enbale `future` feature in your `Cargo.toml` and use `wg::future::AsyncWaitGroup`.
+enbale `future` feature in your `Cargo.toml` and use `wg::AsyncWaitGroup`.
 
-### Sync
 
-```toml
-[dependencies]
-wg = "0.8"
-```
+## Installation
 
-### `tokio`
+- std
 
-An async implementation for `tokio` runtime.
+    ```toml
+    [dependencies]
+    wg = "0.9"
+    ```
 
-```toml
-[dependencies]
-wg = { version = "0.8", features = ["tokio"] }
-```
 
-### `future`
+- `future`
 
-A more generic async implementation.
+    ```toml
+    [dependencies]
+    wg = { version = "0.9", features = ["future"] }
+    ```
 
-```toml
-[dependencies]
-wg = { version = "0.8", features = ["future"] }
-```
+- no_std
 
-## Instruction
+    ```toml
+    [dependencies]
+    wg = { version = "0.9", default_features = false, features = ["alloc"] }
+    ```
+
+- no_std & future
+
+    ```toml
+    [dependencies]
+    wg = { version = "0.9", default_features = false, features = ["alloc", "future"] }
+    ```
+
+## Examples
 
 ### Sync
 
@@ -83,10 +88,10 @@ fn main() {
 }
 ```
 
-### `tokio`
+### Async
 
 ```rust
-use wg::tokio::AsyncWaitGroup;
+use wg::AsyncWaitGroup;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::{spawn, time::{sleep, Duration}};
@@ -114,39 +119,6 @@ async fn main() {
 }
 ```
 
-### `async-io`
-
-```rust
-use wg::future::AsyncWaitGroup;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
-use async_std::task::{spawn, block_on, sleep};
-
-fn main() {
-    block_on(async {
-        let wg = AsyncWaitGroup::new();
-        let ctr = Arc::new(AtomicUsize::new(0));
-
-        for _ in 0..5 {
-            let ctrx = ctr.clone();
-            let t_wg = wg.add(1);
-            spawn(async move {
-                // mock some time consuming task
-                sleep(Duration::from_millis(50)).await;
-                ctrx.fetch_add(1, Ordering::Relaxed);
-
-                // mock task is finished
-                t_wg.done();
-            });
-        }
-
-        wg.wait().await;
-        assert_eq!(ctr.load(Ordering::Relaxed), 5);
-    });
-}
-```
-
 ## Acknowledgements
 
 - Inspired by Golang sync.WaitGroup and [`crossbeam_utils::WaitGroup`].
@@ -157,6 +129,7 @@ fn main() {
 Licensed under either of <a href="https://opensource.org/licenses/Apache-2.0">Apache License, Version
 2.0</a> or <a href="https://opensource.org/licenses/MIT">MIT license</a> at your option.
 </sup>
+
 
 <sub>
 Unless you explicitly state otherwise, any contribution intentionally submitted

@@ -4,9 +4,10 @@ use tokio::{
     spawn,
     time::{sleep, Duration},
 };
-use wg::future::AsyncWaitGroup;
+use wg::AsyncWaitGroup;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     async_std::task::block_on(async {
         let wg = AsyncWaitGroup::new();
         let ctr = Arc::new(AtomicUsize::new(0));
