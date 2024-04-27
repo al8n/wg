@@ -160,7 +160,7 @@ impl WaitGroup {
     /// ```
     pub fn wait(&self) {
         while self.inner.counter.load(Ordering::SeqCst) != 0 {
-            core::hint::spin_loop();
+            crossbeam_utils::Backoff::new().spin();
         }
     }
 }

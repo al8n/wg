@@ -273,7 +273,6 @@ pin_project_lite::pin_project! {
     /// A future returned by [`AsyncWaitGroup::wait()`].
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub struct WaitGroupFuture<'a> {
         inner: &'a AsyncWaitGroup,
         #[pin]

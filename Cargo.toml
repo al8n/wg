@@ -6,7 +6,7 @@ homepage = "https://github.com/al8n/wg"
 repository = "https://github.com/al8n/wg.git"
 documentation = "https://docs.rs/wg/"
 readme = "README.md"
-version = "0.9.0"
+version = "0.9.1"
 license = "MIT OR Apache-2.0"
 keywords = ["waitgroup", "async", "sync", "notify", "wake"]
 categories = ["asynchronous", "concurrency", "data-structures", "no-std"]
@@ -14,7 +14,7 @@ edition = "2021"
 
 [features]
 default = ["std", "parking_lot", "triomphe"]
-alloc = ["event-listener"]
+alloc = ["crossbeam-utils"]
 std = ["triomphe?/default", "event-listener?/default", "futures-core?/default"]
 triomphe = ["dep:triomphe"]
 parking_lot = ["dep:parking_lot"]
@@ -27,6 +27,8 @@ event-listener = { version = "5", optional = true, default-features = false, fea
 
 pin-project-lite = { version = "0.2", optional = true }
 futures-core = { version = "0.3", default-features = false, optional = true }
+
+crossbeam-utils = { version = "0.8", optional = true, default-features = false }
 
 [dev-dependencies]
 agnostic-lite = { version = "0.3", features = ["smol", "async-std", "tokio", "time"] }

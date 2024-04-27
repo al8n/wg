@@ -162,7 +162,6 @@ impl WaitGroup {
     /// [`wait`]: struct.AsyncWaitGroup.html#method.wait
     pub fn add(&self, num: usize) -> Self {
         let mut ctr = self.inner.count.lock_me();
-
         *ctr += num;
         Self {
             inner: self.inner.clone(),
