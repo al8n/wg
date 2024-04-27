@@ -6,21 +6,13 @@ use core::{
     task::{Context, Poll},
 };
 
-pub use agnostic_lite::{AsyncSpawner, Detach};
+#[cfg(feature = "triomphe")]
+use triomphe::Arc;
 
-#[cfg(feature = "smol")]
-pub use agnostic_lite::smol::SmolSpawner;
-
-#[cfg(feature = "tokio")]
-pub use agnostic_lite::tokio::TokioSpawner;
-
-#[cfg(feature = "async-std")]
-pub use agnostic_lite::async_std::AsyncStdSpawner;
-
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(feature = "triomphe")))]
 use std::sync::Arc;
 
-#[cfg(not(feature = "std"))]
+#[cfg(all(not(feature = "std"), not(feature = "triomphe")))]
 use alloc::sync::Arc;
 
 #[derive(Debug)]
@@ -40,7 +32,7 @@ struct AsyncInner {
 /// # Example
 ///
 /// ```rust
-/// use wg::future::AsyncWaitGroup;
+/// use wg::AsyncWaitGroup;
 /// use std::sync::Arc;
 /// use std::sync::atomic::{AtomicUsize, Ordering};
 /// use std::time::Duration;
@@ -132,7 +124,7 @@ impl AsyncWaitGroup {
     /// # Example
     ///
     /// ```rust
-    /// use wg::future::AsyncWaitGroup;
+    /// use wg::AsyncWaitGroup;
     /// use async_std::task::spawn;
     ///
     /// # async_std::task::block_on(async {
@@ -165,7 +157,7 @@ impl AsyncWaitGroup {
     /// # Example
     ///
     /// ```rust
-    /// use wg::future::AsyncWaitGroup;
+    /// use wg::AsyncWaitGroup;
     /// use async_std::task::spawn;
     ///
     /// # async_std::task::block_on(async {
@@ -179,7 +171,18 @@ impl AsyncWaitGroup {
     /// # })
     /// ```
     pub fn done(&self) {
-        if self.inner.counter.fetch_sub(1, Ordering::SeqCst) == 1 {
+        if self
+            .inner
+            .counter
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |v| {
+                if v != 0 {
+                    Some(v - 1)
+                } else {
+                    None
+                }
+            })
+            .is_ok()
+        {
             self.inner.event.notify(usize::MAX);
         }
     }
@@ -194,7 +197,7 @@ impl AsyncWaitGroup {
     /// # Example
     ///
     /// ```rust
-    /// use wg::future::AsyncWaitGroup;
+    /// use wg::AsyncWaitGroup;
     /// use async_std::task::spawn;
     ///
     /// # async_std::task::block_on(async {
@@ -228,7 +231,7 @@ impl AsyncWaitGroup {
     /// # Example
     ///
     /// ```rust
-    /// use wg::future::{AsyncWaitGroup, AsyncStdSpawner};
+    /// use wg::{AsyncWaitGroup, AsyncStdSpawner};
     /// use async_std::task::spawn;
     ///
     /// # async_std::task::block_on(async {
@@ -245,21 +248,17 @@ impl AsyncWaitGroup {
     /// wg.block_wait::<AsyncStdSpawner>();
     /// # })
     /// ```
-    #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-    pub fn block_wait<S>(&self)
-    where
-        S: agnostic_lite::AsyncSpawner,
-    {
-        let this = self.clone();
-        let (tx, rx) = std::sync::mpsc::channel();
+    pub fn wait_blocking(&self) {
+        use event_listener::Listener;
 
-        S::spawn_detach(async move {
-            this.wait().await;
-            let _ = tx.send(());
-        });
-
-        let _ = rx.recv();
+        while self.inner.counter.load(Ordering::SeqCst) != 0 {
+            let ln = self.inner.event.listen();
+            // Check the flag again after creating the listener.
+            if self.inner.counter.load(Ordering::SeqCst) == 0 {
+                return;
+            }
+            ln.wait();
+        }
     }
 }
 
@@ -288,8 +287,12 @@ impl<'a> core::future::Future for WaitGroupFuture<'a> {
         let this = self.project();
         match this.notified.poll(cx) {
             Poll::Pending => {
-                cx.waker().wake_by_ref();
-                Poll::Pending
+                if this.inner.inner.counter.load(Ordering::SeqCst) == 0 {
+                    Poll::Ready(())
+                } else {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
             }
             Poll::Ready(_) => {
                 if this.inner.inner.counter.load(Ordering::SeqCst) == 0 {
