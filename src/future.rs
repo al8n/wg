@@ -27,8 +27,6 @@ struct AsyncInner {
 /// runs and calls Done when finished. At the same time,
 /// Wait can be used to block until all tasks have finished.
 ///
-/// A WaitGroup must not be copied after first use.
-///
 /// # Example
 ///
 /// ```rust
