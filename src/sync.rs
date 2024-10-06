@@ -7,7 +7,10 @@ trait Mu {
 
 #[cfg(feature = "parking_lot")]
 impl<T: ?Sized> Mu for parking_lot::Mutex<T> {
-    type Guard<'a> = parking_lot::MutexGuard<'a, T> where Self: 'a;
+    type Guard<'a>
+        = parking_lot::MutexGuard<'a, T>
+    where
+        Self: 'a;
 
     fn lock_me(&self) -> Self::Guard<'_> {
         self.lock()
@@ -16,7 +19,10 @@ impl<T: ?Sized> Mu for parking_lot::Mutex<T> {
 
 #[cfg(not(feature = "parking_lot"))]
 impl<T: ?Sized> Mu for std::sync::Mutex<T> {
-    type Guard<'a> = std::sync::MutexGuard<'a, T> where Self: 'a;
+    type Guard<'a>
+        = std::sync::MutexGuard<'a, T>
+    where
+        Self: 'a;
 
     fn lock_me(&self) -> Self::Guard<'_> {
         self.lock().unwrap()
@@ -38,6 +44,7 @@ struct Inner {
 }
 
 /// A WaitGroup waits for a collection of threads to finish.
+///
 /// The main thread calls [`add`] to set the number of
 /// thread to wait for. Then each of the goroutines
 /// runs and calls Done when finished. At the same time,

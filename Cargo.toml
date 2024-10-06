@@ -6,7 +6,7 @@ homepage = "https://github.com/al8n/wg"
 repository = "https://github.com/al8n/wg.git"
 documentation = "https://docs.rs/wg/"
 readme = "README.md"
-version = "0.9.1"
+version = "0.9.2"
 license = "MIT OR Apache-2.0"
 keywords = ["waitgroup", "async", "sync", "notify", "wake"]
 categories = ["asynchronous", "concurrency", "data-structures", "no-std"]
@@ -26,12 +26,12 @@ triomphe = { version = "0.1", optional = true, default-features = false }
 event-listener = { version = "5", optional = true, default-features = false, features = ["portable-atomic"] }
 
 pin-project-lite = { version = "0.2", optional = true }
-futures-core = { version = "0.3", default-features = false, optional = true }
+futures-core = { version = "^0.3.31", default-features = false, optional = true }
 
 crossbeam-utils = { version = "0.8", optional = true, default-features = false }
 
 [dev-dependencies]
-agnostic-lite = { version = "0.3", features = ["smol", "async-std", "tokio", "time"] }
+agnostic-lite = { version = "^0.3.16", features = ["smol", "async-std", "tokio", "time"] }
 tokio = { version = "1", features = ["full"] }
 async-std = { version = "1", features = ["attributes"] }
 smol = "2"
@@ -43,9 +43,14 @@ rustdoc-args = ["--cfg", "docsrs"]
 [[test]]
 name = "future"
 path = "tests/future.rs"
-required-features = ["future"]
+required-features = ["tokio"]
 
 [[test]]
 name = "sync"
 path = "tests/sync.rs"
+
+[[example]]
+name = "future"
+path = "examples/future.rs"
+required-features = ["tokio"]
 

@@ -22,6 +22,7 @@ struct AsyncInner {
 }
 
 /// An AsyncWaitGroup waits for a collection of threads to finish.
+///
 /// The main thread calls [`add`] to set the number of
 /// thread to wait for. Then each of the tasks
 /// runs and calls Done when finished. At the same time,
@@ -280,7 +281,7 @@ pin_project_lite::pin_project! {
     }
 }
 
-impl<'a> core::future::Future for WaitGroupFuture<'a> {
+impl core::future::Future for WaitGroupFuture<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
