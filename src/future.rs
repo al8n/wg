@@ -9,11 +9,8 @@ use core::{
 #[cfg(feature = "triomphe")]
 use triomphe::Arc;
 
-#[cfg(all(feature = "std", not(feature = "triomphe")))]
+#[cfg(all(any(feature = "std", feature = "alloc"), not(feature = "triomphe")))]
 use std::sync::Arc;
-
-#[cfg(all(not(feature = "std"), not(feature = "triomphe")))]
-use alloc::sync::Arc;
 
 #[derive(Debug)]
 struct AsyncInner {

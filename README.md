@@ -36,8 +36,8 @@ primitive.
 | Type | When to use | Backed by |
 |---|---|---|
 | [`wg::WaitGroup`] | Default choice for synchronous code on `std`. Blocks the calling thread in `wait`. | `Mutex` + `Condvar` (or `parking_lot` equivalents) |
-| [`wg::future::WaitGroup`] | Async contexts. Works with any async runtime (tokio, smol, …). Exposes `wait().await` plus a `wait_blocking()` escape hatch. | [`event-listener`] |
-| [`wg::spin::WaitGroup`] | `no_std` / `no-alloc` environments, or short waits where you want to avoid OS synchronization. | `AtomicUsize` with adaptive backoff (yields on `std`, spins on pure `no_std`) |
+| [`wg::future::WaitGroup`] | Async contexts (also support `no_std` + `alloc` environments). Works with any async runtime (tokio, smol, …). Exposes `wait().await` plus a `wait_blocking()` escape hatch. | [`event-listener`] |
+| [`wg::spin::WaitGroup`] | `no_std` + `alloc` environments, or short waits where you want to avoid OS synchronization. | `AtomicUsize` with adaptive backoff (yields on `std`, spins on pure `no_std`) |
 
 All three implement `Clone`, `Debug`, `Send + Sync`, and `From<usize>`. API is
 otherwise identical — easy to switch between variants.

@@ -17,10 +17,9 @@
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-#[cfg(all(not(feature = "triomphe"), not(feature = "std")))]
-use alloc::sync::Arc;
-#[cfg(all(not(feature = "triomphe"), feature = "std"))]
+#[cfg(all(any(feature = "std", feature = "alloc"), not(feature = "triomphe")))]
 use std::sync::Arc;
+
 #[cfg(feature = "triomphe")]
 use triomphe::Arc;
 
