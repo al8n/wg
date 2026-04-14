@@ -20,31 +20,38 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(not(all(feature = "std", test)), no_std)]
 #![deny(missing_docs, warnings)]
+#![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(docsrs, allow(unused_attributes))]
 
-#[cfg(not(any(feature = "alloc", feature = "std")))]
-compile_error!("This crate can only be used when feature `alloc` or `std` is enabled");
-
-#[cfg(not(feature = "std"))]
-extern crate alloc;
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
+extern crate alloc as std;
 
 #[cfg(feature = "std")]
 extern crate std;
 
-#[cfg(feature = "future")]
-mod future;
-
-#[cfg(feature = "future")]
-#[cfg_attr(docsrs, doc(cfg(feature = "future")))]
-pub use future::*;
+/// A WaitGroup that can be used in async contexts. See [`future::WaitGroup`] for details.
+#[cfg(all(any(feature = "std", feature = "alloc"), feature = "future"))]
+#[cfg_attr(
+  docsrs,
+  doc(cfg(all(any(feature = "std", feature = "alloc"), feature = "future")))
+)]
+pub mod future;
 
 #[cfg(feature = "std")]
 mod sync;
 #[cfg(feature = "std")]
 pub use sync::*;
 
-#[cfg(not(feature = "std"))]
-mod no_std;
-#[cfg(not(feature = "std"))]
-pub use no_std::*;
+/// A lock-free, atomic-counter WaitGroup that spins on `wait`.
+///
+/// Available in both `std` and `no_std` environments. See
+/// [`spin::WaitGroup`] for details.
+#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "std", feature = "alloc"))))]
+pub mod spin;
+
+/// In `no_std` builds, `WaitGroup` is an alias for [`spin::WaitGroup`].
+/// In `std` builds, `WaitGroup` is the `Mutex`/`Condvar`-based variant.
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
+pub use spin::WaitGroup;
