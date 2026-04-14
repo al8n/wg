@@ -25,7 +25,11 @@ impl<T: ?Sized> Mu for std::sync::Mutex<T> {
         Self: 'a;
 
     fn lock_me(&self) -> Self::Guard<'_> {
-        self.lock().unwrap()
+        // Poisoning is not meaningful for a `usize` counter: the worst a
+        // panicking thread can leave behind is a stale count, not corrupt
+        // memory. Recovering the guard avoids cascading panics across all
+        // other threads that touch this WaitGroup.
+        self.lock().unwrap_or_else(|e| e.into_inner())
     }
 }
 
@@ -124,6 +128,20 @@ impl std::fmt::Debug for WaitGroup {
     }
 }
 
+/// Shorthand for [`add`](WaitGroup::add), discarding the returned clone.
+///
+/// ```
+/// use wg::WaitGroup;
+/// let mut wg = WaitGroup::new();
+/// wg += 3;
+/// assert_eq!(wg.remaining(), 3);
+/// ```
+impl core::ops::AddAssign<usize> for WaitGroup {
+    fn add_assign(&mut self, rhs: usize) {
+        self.add(rhs);
+    }
+}
+
 impl WaitGroup {
     /// Creates a new wait group and returns the single reference to it.
     ///
@@ -138,37 +156,65 @@ impl WaitGroup {
         Self::default()
     }
 
-    /// Adds delta to the WaitGroup counter.
-    /// If the counter becomes zero, all threads blocked on [`wait`] are released.
+    /// Increments the counter by `num` and returns a handle sharing the
+    /// same counter.
     ///
-    /// Note that calls with a delta that occur when the counter is zero
-    /// must happen before a Wait.
-    /// Typically this means the calls to add should execute before the statement
-    /// creating the thread or other event to be waited for.
-    /// If a `WaitGroup` is reused to [`wait`] for several independent sets of events,
-    /// new `add` calls must happen after all previous [`wait`] calls have returned.
+    /// The returned value is a clone of the existing `WaitGroup`, **not**
+    /// a separate group — all copies operate on the same underlying
+    /// counter. Returning the handle is a convenience for the common
+    /// pattern of immediately passing ownership to a spawned task:
     ///
-    /// # Example
     /// ```rust
     /// use wg::WaitGroup;
     ///
     /// let wg = WaitGroup::new();
-    ///
-    /// wg.add(3);
-    /// (0..3).for_each(|_| {
-    ///     let t_wg = wg.clone();
-    ///     std::thread::spawn(move || {
-    ///         // do some time consuming work
-    ///         t_wg.done();
-    ///     });
+    /// let t_wg = wg.add(1);
+    /// std::thread::spawn(move || {
+    ///     // do some time consuming work
+    ///     t_wg.done();
     /// });
-    ///
     /// wg.wait();
     /// ```
     ///
-    /// [`wait`]: struct.AsyncWaitGroup.html#method.wait
+    /// Ignoring the return value is valid — it just drops a cheap handle;
+    /// the counter increment is still in effect. Use this form when you
+    /// want to spawn multiple workers that each clone the group:
+    ///
+    /// ```rust
+    /// use wg::WaitGroup;
+    ///
+    /// let wg = WaitGroup::new();
+    /// wg.add(3);                         // counter += 3
+    /// for _ in 0..3 {
+    ///     let t_wg = wg.clone();         // clone for each task
+    ///     std::thread::spawn(move || {
+    ///         t_wg.done();
+    ///     });
+    /// }
+    /// wg.wait();
+    /// ```
+    ///
+    /// When the counter later reaches zero, all threads blocked in
+    /// [`wait`](Self::wait) are released.
+    ///
+    /// # Ordering requirements
+    ///
+    /// Calls that bring the counter up from zero must happen before any
+    /// [`wait`](Self::wait) call — typically by running them on the main
+    /// thread before spawning the workers.
+    ///
+    /// If a `WaitGroup` is reused for several independent rounds, new
+    /// `add` calls must happen after all previous [`wait`](Self::wait)
+    /// calls have returned.
     pub fn add(&self, num: usize) -> Self {
         let mut ctr = self.inner.count.lock_me();
+        // In debug builds, give a clear message on overflow. `+=` already
+        // panics in debug builds on overflow, but with a generic message.
+        debug_assert!(
+            ctr.checked_add(num).is_some(),
+            "WaitGroup counter overflow: {ctr} + {num}",
+            ctr = *ctr,
+        );
         *ctr += num;
         Self {
             inner: self.inner.clone(),
@@ -206,8 +252,9 @@ impl WaitGroup {
         *val
     }
 
-    /// waitings return how many jobs are waiting.
-    pub fn waitings(&self) -> usize {
+    /// Returns the current counter value — the number of threads still
+    /// waiting to complete.
+    pub fn remaining(&self) -> usize {
         *self.inner.count.lock_me()
     }
 
@@ -245,7 +292,7 @@ impl WaitGroup {
 
             #[cfg(not(feature = "parking_lot"))]
             {
-                ctr = self.inner.cvar.wait(ctr).unwrap();
+                ctr = self.inner.cvar.wait(ctr).unwrap_or_else(|e| e.into_inner());
             }
         }
     }

@@ -20,6 +20,7 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(not(all(feature = "std", test)), no_std)]
 #![deny(missing_docs, warnings)]
+#![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(docsrs, allow(unused_attributes))]
 
@@ -32,19 +33,24 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-#[cfg(feature = "future")]
-mod future;
-
+/// A WaitGroup that can be used in async contexts. See [`future::WaitGroup`] for details.
 #[cfg(feature = "future")]
 #[cfg_attr(docsrs, doc(cfg(feature = "future")))]
-pub use future::*;
+pub mod future;
 
 #[cfg(feature = "std")]
 mod sync;
 #[cfg(feature = "std")]
 pub use sync::*;
 
+/// A lock-free, atomic-counter WaitGroup that spins on `wait`.
+///
+/// Available in both `std` and `no_std` environments. See
+/// [`spin::WaitGroup`] for details.
+pub mod spin;
+
+/// In `no_std` builds, `WaitGroup` is an alias for [`WaitGroup`].
+/// In `std` builds, `WaitGroup` is the `Mutex`/`Condvar`-based variant
+/// from the [`sync`] module.
 #[cfg(not(feature = "std"))]
-mod no_std;
-#[cfg(not(feature = "std"))]
-pub use no_std::*;
+pub use spin::WaitGroup;

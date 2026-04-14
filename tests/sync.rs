@@ -77,9 +77,37 @@ fn test_clone_and_fmt() {
 }
 
 #[test]
-fn test_waitings() {
+fn test_remaining() {
     let wg = WaitGroup::new();
     wg.add(1);
     wg.add(1);
-    assert_eq!(wg.waitings(), 2);
+    assert_eq!(wg.remaining(), 2);
+}
+
+/// `done()` on a zero counter is a silent no-op and returns 0.
+#[test]
+fn test_over_done_is_silent() {
+    let wg = WaitGroup::new();
+    assert_eq!(wg.done(), 0);
+    assert_eq!(wg.done(), 0);
+    assert_eq!(wg.remaining(), 0);
+}
+
+/// `wait()` on a zero counter returns immediately without blocking.
+#[test]
+fn test_wait_on_zero_returns_immediately() {
+    let wg = WaitGroup::new();
+    let start = std::time::Instant::now();
+    wg.wait();
+    assert!(start.elapsed() < Duration::from_millis(50));
+}
+
+/// `+=` is shorthand for `add(n)`.
+#[test]
+fn test_add_assign() {
+    let mut wg = WaitGroup::new();
+    wg += 3;
+    assert_eq!(wg.remaining(), 3);
+    wg += 2;
+    assert_eq!(wg.remaining(), 5);
 }
