@@ -22,7 +22,14 @@ Golang like WaitGroup implementation for sync/async Rust, support `no_std` envir
 primitive for the context you're in — blocking, async, or lock-free — all with
 the same `add` / `done` / `wait` / `remaining` surface.
 
-The crate forbids `unsafe` (`#![forbid(unsafe_code)]`) and ships with Miri in CI.
+## Status
+
+`wg` follows [Semantic Versioning](https://semver.org/) and has a deliberately
+narrow scope: three `WaitGroup` variants (blocking, async, lock-free). The API
+is considered complete for that scope. Bug fixes, documentation improvements,
+and small non-breaking additions (trait impls, ergonomic tweaks) are welcome;
+new features outside the WaitGroup concept are out of scope — use a different
+primitive.
 
 ## Which `WaitGroup` should I use?
 
@@ -85,13 +92,11 @@ major version bump.
 ## Acknowledgements
 
 - Inspired by Go's `sync.WaitGroup` and [`crossbeam_utils::WaitGroup`].
-- `future::WaitGroup` was originally based on [`ibraheemdev/awaitgroup`].
 
 [`wg::WaitGroup`]: https://docs.rs/wg/latest/wg/struct.WaitGroup.html
 [`wg::future::WaitGroup`]: https://docs.rs/wg/latest/wg/future/struct.WaitGroup.html
 [`wg::spin::WaitGroup`]: https://docs.rs/wg/latest/wg/spin/struct.WaitGroup.html
 [`event-listener`]: https://docs.rs/event-listener
-[`ibraheemdev/awaitgroup`]: https://github.com/ibraheemdev/awaitgroup
 
 ## License
 
@@ -107,7 +112,6 @@ for inclusion in this project by you, as defined in the Apache-2.0 license,
 shall be dual licensed as above, without any additional terms or conditions.
 </sub>
 
-[ibraheemdev's `AwaitGroup`]: https://github.com/ibraheemdev/awaitgroup
 [`crossbeam_utils::WaitGroup`]: https://docs.rs/crossbeam/0.8.1/crossbeam/sync/struct.WaitGroup.html
 [Github-url]: https://github.com/al8n/wg/
 [CI-url]: https://github.com/al8n/wg/actions/workflows/ci.yml
