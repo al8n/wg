@@ -27,8 +27,7 @@ async fn basic_in<S: RuntimeLite>() {
     S::spawn_detach(async move {
       S::sleep(Duration::from_millis(50)).await;
       ctrx.fetch_add(1, Ordering::Relaxed);
-      let remaining = wg.done();
-      println!("remaining: {}", remaining);
+      wg.done();
     });
   }
   wg.wait().await;
