@@ -1,12 +1,14 @@
 //! A lock-free, atomic-counter WaitGroup.
 //!
 //! [`WaitGroup`] uses atomic operations and an adaptive spin-loop to wait
-//! for completion, so it needs no `Mutex`/`Condvar` and works in `no_std`
-//! environments. On `std` the adaptive backoff yields the OS thread once its
-//! short-spin budget is exhausted; on pure `no_std` it keeps spinning.
+//! for completion, so it needs no `Mutex`/`Condvar`. It works under `std`
+//! and in `no_std + alloc` environments, but it is not usable in pure
+//! `core`/no-allocation environments because it stores shared state in `Arc`.
+//! On `std` the adaptive backoff yields the OS thread once its short-spin
+//! budget is exhausted; on `no_std + alloc` it keeps spinning.
 //!
 //! Use `WaitGroup` when:
-//! - You are in a `no_std` environment.
+//! - You are in a `no_std + alloc` environment.
 //! - The expected wait is short and you want to avoid OS synchronization
 //!   overhead.
 //!
@@ -59,7 +61,7 @@ struct Inner {
 /// # Example
 ///
 /// ```rust
-/// use wg::WaitGroup;
+/// use wg::spin::WaitGroup;
 /// use std::sync::atomic::{AtomicUsize, Ordering};
 /// use std::sync::Arc;
 ///

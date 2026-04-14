@@ -21,7 +21,7 @@ required-features = ["std"]
 [[example]]
 name = "future"
 path = "examples/future.rs"
-required-features = ["future", "alloc"]
+required-features = ["future", "std"]
 
 [features]
 default = ["std", "parking_lot", "triomphe"]

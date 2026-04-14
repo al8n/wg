@@ -51,8 +51,7 @@ pub use sync::*;
 #[cfg_attr(docsrs, doc(cfg(any(feature = "std", feature = "alloc"))))]
 pub mod spin;
 
-/// In `no_std` builds, `WaitGroup` is an alias for [`WaitGroup`].
-/// In `std` builds, `WaitGroup` is the `Mutex`/`Condvar`-based variant
-/// from the [`sync`] module.
+/// In `no_std` builds, `WaitGroup` is an alias for [`spin::WaitGroup`].
+/// In `std` builds, `WaitGroup` is the `Mutex`/`Condvar`-based variant.
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
 pub use spin::WaitGroup;
