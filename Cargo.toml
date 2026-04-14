@@ -26,7 +26,7 @@ required-features = ["future", "std"]
 [features]
 default = ["std", "parking_lot", "triomphe"]
 alloc = []
-std = ["triomphe?/default", "event-listener?/default", "futures-core?/default"]
+std = ["triomphe?/default", "event-listener?/default"]
 triomphe = ["dep:triomphe"]
 parking_lot = ["dep:parking_lot"]
 future = ["event-listener", "pin-project-lite"]
@@ -37,7 +37,6 @@ triomphe = { version = "0.1", optional = true, default-features = false }
 event-listener = { version = "5", optional = true, default-features = false, features = ["portable-atomic"] }
 
 pin-project-lite = { version = "0.2", optional = true }
-futures-core = { version = "0.3", default-features = false, optional = true }
 
 [dev-dependencies]
 agnostic-lite = { version = "0.6", features = ["smol", "tokio", "time"] }

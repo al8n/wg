@@ -180,7 +180,7 @@ async fn wake_after_updating_in<S: RuntimeLite>() {
       for _ in 0..1000 {
         a += 1;
       }
-      println!("{}", a);
+      debug_assert_eq!(a, 1000);
       S::sleep(std::time::Duration::from_millis(10)).await;
       worker.done();
     });
