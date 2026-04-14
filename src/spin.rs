@@ -11,7 +11,7 @@
 //!   overhead.
 //!
 //! Prefer [`WaitGroup`](crate::WaitGroup) for longer waits under `std`.
-//! Prefer [`AsyncWaitGroup`](crate::AsyncWaitGroup) for async contexts.
+//! Prefer [`future::WaitGroup`](crate::future::WaitGroup) for async contexts.
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 

@@ -73,42 +73,14 @@ wg = { version = "1", default-features = false, features = ["alloc", "future"] }
 
 ## Examples
 
-```rust
-use wg::WaitGroup;
-
-let wg = WaitGroup::new();
-for _ in 0..5 {
-    let t_wg = wg.add(1);
-    std::thread::spawn(move || {
-        // do some time consuming work
-        t_wg.done();
-    });
-}
-wg.wait();
-```
-
-```rust,ignore
-use wg::future::WaitGroup;
-
-# tokio::runtime::Runtime::new().unwrap().block_on(async {
-let wg = WaitGroup::new();
-for _ in 0..5 {
-    let t_wg = wg.add(1);
-    tokio::spawn(async move {
-        // do some async work
-        t_wg.done();
-    });
-}
-wg.wait().await;
-# });
-```
-
 See [`examples/`](./examples) for more.
 
 ## MSRV
 
-Minimum supported Rust version is `1.56.0`. MSRV bumps are considered a
-breaking change and will require a major version bump.
+Minimum supported Rust version is `1.76.0`. This is dictated by the current
+`parking_lot` and `triomphe` minima; enabling neither feature would drop the
+floor further. MSRV bumps are considered a breaking change and will require a
+major version bump.
 
 ## Acknowledgements
 

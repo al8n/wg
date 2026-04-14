@@ -77,7 +77,8 @@ version bump.
   thread on `std` and spins on pure `no_std`.
 - Dedicated integration tests for each variant.
 - Compile-time `Send + Sync` assertions for all three variants.
-- Declared MSRV (`rust-version = "1.56.0"`).
+- Declared MSRV (`rust-version = "1.76.0"`, driven by `parking_lot` and
+  `triomphe` floor requirements).
 
 ### Migration from 0.9
 

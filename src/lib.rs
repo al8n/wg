@@ -24,9 +24,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(docsrs, allow(unused_attributes))]
 
-#[cfg(not(any(feature = "alloc", feature = "std")))]
-compile_error!("This crate can only be used when feature `alloc` or `std` is enabled");
-
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
@@ -34,8 +31,11 @@ extern crate alloc;
 extern crate std;
 
 /// A WaitGroup that can be used in async contexts. See [`future::WaitGroup`] for details.
-#[cfg(feature = "future")]
-#[cfg_attr(docsrs, doc(cfg(feature = "future")))]
+#[cfg(all(any(feature = "std", feature = "alloc"), feature = "future"))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(all(any(feature = "std", feature = "alloc"), feature = "future")))
+)]
 pub mod future;
 
 #[cfg(feature = "std")]
@@ -47,10 +47,12 @@ pub use sync::*;
 ///
 /// Available in both `std` and `no_std` environments. See
 /// [`spin::WaitGroup`] for details.
+#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "std", feature = "alloc"))))]
 pub mod spin;
 
 /// In `no_std` builds, `WaitGroup` is an alias for [`WaitGroup`].
 /// In `std` builds, `WaitGroup` is the `Mutex`/`Condvar`-based variant
 /// from the [`sync`] module.
-#[cfg(not(feature = "std"))]
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
 pub use spin::WaitGroup;

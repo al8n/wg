@@ -1,12 +1,21 @@
-use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+#![cfg(any(feature = "std", feature = "alloc"))]
+
+use core::{
+    sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
 use wg::spin::WaitGroup;
 
+#[cfg(feature = "std")]
+extern crate std;
+
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+extern crate alloc as std;
+
+#[cfg(feature = "std")]
+use std::sync::Arc;
+
+#[cfg(feature = "std")]
 #[test]
 fn basic() {
     let wg = WaitGroup::new();
@@ -26,6 +35,7 @@ fn basic() {
     assert_eq!(ctr.load(Ordering::Relaxed), 5);
 }
 
+#[cfg(feature = "std")]
 #[test]
 fn reuse() {
     let wg = WaitGroup::new();
@@ -44,6 +54,7 @@ fn reuse() {
     assert_eq!(wg.remaining(), 0);
 }
 
+#[cfg(feature = "std")]
 #[test]
 fn from_count() {
     let wg = WaitGroup::from(3);
@@ -76,6 +87,7 @@ fn debug_and_clone() {
     assert_eq!(wg.remaining(), 2);
 }
 
+#[cfg(feature = "std")]
 #[test]
 fn wait_on_zero_returns_immediately() {
     let wg = WaitGroup::new();

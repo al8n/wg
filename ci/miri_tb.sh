@@ -35,4 +35,4 @@ cargo miri setup
 
 export MIRIFLAGS="-Zmiri-strict-provenance -Zmiri-disable-isolation -Zmiri-symbolic-alignment-check -Zmiri-tree-borrows"
 
-cargo miri test --all-targets --target "$TARGET"
+cargo miri test --all-targets --target "$TARGET" --no-default-features --features std,future

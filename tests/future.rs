@@ -1,13 +1,20 @@
+#![cfg(all(any(feature = "std", feature = "alloc"), feature = "future"))]
+
+#[cfg(feature = "std")]
+extern crate std;
+
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+extern crate alloc as std;
+
 use agnostic_lite::{AsyncSpawner, RuntimeLite};
 use wg::future::WaitGroup;
 
 use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
+
+use std::sync::Arc;
 
 async fn basic_in<S: RuntimeLite>() {
     let wg = WaitGroup::new();
@@ -234,7 +241,6 @@ fn test_wait_blocking_on_zero_returns_immediately() {
 mod manual_poll {
     use super::*;
     use std::future::Future;
-    use std::pin::Pin;
     use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
     const NOOP_VTABLE: RawWakerVTable = RawWakerVTable::new(

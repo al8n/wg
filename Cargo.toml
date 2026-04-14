@@ -11,7 +11,17 @@ license = "MIT OR Apache-2.0"
 keywords = ["waitgroup", "async", "sync", "notify", "wake"]
 categories = ["asynchronous", "concurrency", "data-structures", "no-std"]
 edition = "2021"
-rust-version = "1.56.0"
+rust-version = "1.76.0"
+
+[[example]]
+name = "sync"
+path = "examples/sync.rs"
+required-features = ["std"]
+
+[[example]]
+name = "future"
+path = "examples/future.rs"
+required-features = ["future", "alloc"]
 
 [features]
 default = ["std", "parking_lot", "triomphe"]
@@ -46,9 +56,3 @@ required-features = ["future"]
 [[test]]
 name = "sync"
 path = "tests/sync.rs"
-
-[[example]]
-name = "future"
-path = "examples/future.rs"
-required-features = ["future"]
-
