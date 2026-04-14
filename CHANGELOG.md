@@ -68,7 +68,6 @@ version bump.
   everywhere was unnecessarily strong — `Release`/`Acquire` provides the
   required happens-before edges for this structure.
 - `#![forbid(unsafe_code)]` is now enforced at the crate level.
-- Miri is run as part of CI.
 
 ### Added
 
