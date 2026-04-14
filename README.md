@@ -100,17 +100,12 @@ major version bump.
 
 ## License
 
-<sup>
-Licensed under either of <a href="https://opensource.org/licenses/Apache-2.0">Apache License, Version
-2.0</a> or <a href="https://opensource.org/licenses/MIT">MIT license</a> at your option.
-</sup>
+`wg` is under the terms of both the MIT license and the
+Apache License (Version 2.0).
 
+See [LICENSE-APACHE](LICENSE-APACHE), [LICENSE-MIT](LICENSE-MIT) for details.
 
-<sub>
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in this project by you, as defined in the Apache-2.0 license,
-shall be dual licensed as above, without any additional terms or conditions.
-</sub>
+Copyright (c) 2026 Al Liu.
 
 [`crossbeam_utils::WaitGroup`]: https://docs.rs/crossbeam/0.8.1/crossbeam/sync/struct.WaitGroup.html
 [Github-url]: https://github.com/al8n/wg/
