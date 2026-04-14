@@ -33,8 +33,8 @@ extern crate std;
 /// A WaitGroup that can be used in async contexts. See [`future::WaitGroup`] for details.
 #[cfg(all(any(feature = "std", feature = "alloc"), feature = "future"))]
 #[cfg_attr(
-    docsrs,
-    doc(cfg(all(any(feature = "std", feature = "alloc"), feature = "future")))
+  docsrs,
+  doc(cfg(all(any(feature = "std", feature = "alloc"), feature = "future")))
 )]
 pub mod future;
 

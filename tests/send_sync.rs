@@ -11,12 +11,12 @@ const fn _assert_send_sync<T: Send + Sync>() {}
 
 #[test]
 fn waitgroup_is_send_sync() {
-    #[cfg(feature = "std")]
-    _assert_send_sync::<wg::WaitGroup>();
-    #[cfg(any(feature = "alloc", feature = "std"))]
-    _assert_send_sync::<wg::spin::WaitGroup>();
-    #[cfg(feature = "future")]
-    {
-        _assert_send_sync::<wg::future::WaitGroup>();
-    }
+  #[cfg(feature = "std")]
+  _assert_send_sync::<wg::WaitGroup>();
+  #[cfg(any(feature = "alloc", feature = "std"))]
+  _assert_send_sync::<wg::spin::WaitGroup>();
+  #[cfg(feature = "future")]
+  {
+    _assert_send_sync::<wg::future::WaitGroup>();
+  }
 }
