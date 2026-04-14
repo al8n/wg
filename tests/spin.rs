@@ -1,6 +1,5 @@
 #![cfg(any(feature = "std", feature = "alloc"))]
 
-use core::sync::atomic::{AtomicUsize, Ordering};
 use wg::spin::WaitGroup;
 
 #[cfg(feature = "std")]
@@ -10,7 +9,13 @@ extern crate std;
 extern crate alloc as std;
 
 #[cfg(feature = "std")]
-use std::{sync::Arc, time::Duration};
+use std::{
+  sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+  },
+  time::Duration,
+};
 
 #[cfg(feature = "std")]
 #[test]
