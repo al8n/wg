@@ -115,6 +115,12 @@ jobs:
           key: ${{ runner.os }}-cross-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cross-
+      - name: Install mingw-w64 (windows-gnu targets)
+        # `parking_lot_core` invokes `<triple>-dlltool` when cross-compiling
+        # to *-pc-windows-gnu. The GitHub ubuntu runners don't ship mingw-w64
+        # by default.
+        if: contains(matrix.target, 'pc-windows-gnu')
+        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64
       - name: Install Rust
         run: rustup update stable && rustup default stable
       - name: cargo build --target ${{ matrix.target }}
