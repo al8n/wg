@@ -191,13 +191,17 @@ impl WaitGroup {
   /// `add` calls must happen after all previous [`wait`](Self::wait)
   /// calls have returned.
   pub fn add(&self, num: usize) -> Self {
-    let prev = self.inner.counter.fetch_add(num, Ordering::Release);
-    // In debug builds, catch the (essentially unreachable) case where the
-    // counter wraps past `usize::MAX`. Silent wrap in release.
-    debug_assert!(
-      prev.checked_add(num).is_some(),
-      "WaitGroup counter overflow: {prev} + {num}"
-    );
+    // Use `fetch_update` + `checked_add` so overflow is caught in ALL
+    // builds, not just debug. A plain `fetch_add` would silently wrap
+    // in release mode, which could reset the counter to zero and let
+    // `wait()` return prematurely or hang.
+    self
+      .inner
+      .counter
+      .fetch_update(Ordering::Release, Ordering::Relaxed, |prev| {
+        prev.checked_add(num)
+      })
+      .expect("WaitGroup counter overflow");
     Self {
       inner: self.inner.clone(),
     }

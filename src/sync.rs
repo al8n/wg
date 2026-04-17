@@ -208,14 +208,12 @@ impl WaitGroup {
   /// calls have returned.
   pub fn add(&self, num: usize) -> Self {
     let mut ctr = self.inner.count.lock_me();
-    // In debug builds, give a clear message on overflow. `+=` already
-    // panics in debug builds on overflow, but with a generic message.
-    debug_assert!(
-      ctr.checked_add(num).is_some(),
-      "WaitGroup counter overflow: {ctr} + {num}",
-      ctr = *ctr,
-    );
-    *ctr += num;
+    // `checked_add` in all builds — not just debug. A wrap from
+    // usize::MAX + 1 → 0 would reset the counter and let `wait()`
+    // return prematurely. `+=` only panics on overflow in debug mode.
+    *ctr = ctr
+      .checked_add(num)
+      .expect("WaitGroup counter overflow");
     Self {
       inner: self.inner.clone(),
     }

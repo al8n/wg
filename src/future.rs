@@ -176,13 +176,17 @@ impl WaitGroup {
   /// `add` calls must happen after all previous [`wait`](Self::wait)
   /// calls have returned.
   pub fn add(&self, num: usize) -> Self {
-    let prev = self.inner.counter.fetch_add(num, Ordering::Release);
-    // In debug builds, catch the (essentially unreachable) case where the
-    // counter wraps past `usize::MAX`. Silent wrap in release.
-    debug_assert!(
-      prev.checked_add(num).is_some(),
-      "WaitGroup counter overflow: {prev} + {num}"
-    );
+    // Use `fetch_update` + `checked_add` so overflow is caught in ALL
+    // builds, not just debug. A plain `fetch_add` would silently wrap
+    // in release mode, which could reset the counter to zero and let
+    // `wait()` return prematurely.
+    self
+      .inner
+      .counter
+      .fetch_update(Ordering::Release, Ordering::Relaxed, |prev| {
+        prev.checked_add(num)
+      })
+      .expect("WaitGroup counter overflow");
 
     Self {
       inner: self.inner.clone(),
@@ -291,8 +295,12 @@ impl WaitGroup {
   /// wg.wait_blocking();
   /// # })
   /// ```
-  #[cfg(feature = "std")]
-  #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+  // `EventListener::wait()` (blocking) is not available on
+  // `target_family = "wasm"` — the platform has no OS threads. Gate
+  // this method out so `cargo check --all-features --target
+  // wasm32-unknown-unknown` succeeds.
+  #[cfg(all(feature = "std", not(target_family = "wasm")))]
+  #[cfg_attr(docsrs, doc(cfg(all(feature = "std", not(target_family = "wasm")))))]
   pub fn wait_blocking(&self) {
     use event_listener::Listener;
 

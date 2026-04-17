@@ -127,6 +127,11 @@ jobs:
         run: |
           rustup target add ${{ matrix.target }}
           cargo build --target ${{ matrix.target }}
+    - name: cargo check --all-features --target ${{ matrix.target }}
+      # Catches platform-specific conditional-compilation misses like
+      # `EventListener::wait()` not existing on wasm. Runs in addition
+      # to the default-features build above.
+      run: cargo check --all-features --target ${{ matrix.target }}
 
   build:
     name: build
@@ -154,8 +159,15 @@ jobs:
       run: rustup update stable --no-self-update && rustup default stable
     - name: Install cargo-hack
       run: cargo install cargo-hack
-    - name: Run build
+    - name: Run build (individual features)
       run: cargo hack build --each-feature
+    - name: Run build (feature pairs)
+      # `--each-feature` misses multi-feature combinations like
+      # `alloc + future` that the README advertises. Test those
+      # explicitly.
+      run: |
+        cargo build --no-default-features --features alloc,future
+        cargo build --all-features
   
   test:
     name: test
@@ -183,8 +195,14 @@ jobs:
       run: rustup update stable --no-self-update && rustup default stable
     - name: Install cargo-hack
       run: cargo install cargo-hack
-    - name: Run test
+    - name: Run test (individual features)
       run: cargo hack test --each-feature
+    - name: Run test (feature pairs)
+      # Cover the `alloc + future` combination that cargo-hack's
+      # `--each-feature` mode does not reach, plus the full set.
+      run: |
+        cargo test --no-default-features --features alloc,future
+        cargo test --all-features
 
   coverage:
     name: coverage
