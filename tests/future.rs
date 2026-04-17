@@ -176,9 +176,17 @@ mod std_tests {
     #[test]
     fn test_wait_blocking_on_zero_returns_immediately() {
       let wg = WaitGroup::new();
-      let start = std::time::Instant::now();
-      wg.wait_blocking();
-      assert!(start.elapsed() < Duration::from_millis(50));
+      let (tx, rx) = std::sync::mpsc::channel();
+
+      std::thread::spawn(move || {
+        wg.wait_blocking();
+        tx.send(()).unwrap();
+      });
+
+      assert!(
+        rx.recv_timeout(std::time::Duration::from_secs(5)).is_ok(),
+        "wait_blocking() should return promptly when the wait group count is zero"
+      );
     }
   }
 

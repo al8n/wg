@@ -201,7 +201,9 @@ impl WaitGroup {
       .fetch_update(Ordering::Release, Ordering::Relaxed, |prev| {
         prev.checked_add(num)
       })
-      .expect("WaitGroup counter overflow");
+      .unwrap_or_else(|prev| {
+        panic!("WaitGroup counter overflow: prev={prev}, num={num}")
+      });
     Self {
       inner: self.inner.clone(),
     }
