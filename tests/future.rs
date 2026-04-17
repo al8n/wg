@@ -294,6 +294,9 @@ mod manual_poll {
     assert!(matches!(Pin::as_mut(&mut fut).poll(&mut cx), Poll::Pending));
 
     wg.done();
-    assert!(matches!(Pin::as_mut(&mut fut).poll(&mut cx), Poll::Ready(())));
+    assert!(matches!(
+      Pin::as_mut(&mut fut).poll(&mut cx),
+      Poll::Ready(())
+    ));
   }
 }

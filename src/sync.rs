@@ -211,9 +211,7 @@ impl WaitGroup {
     // `checked_add` in all builds — not just debug. A wrap from
     // usize::MAX + 1 → 0 would reset the counter and let `wait()`
     // return prematurely. `+=` only panics on overflow in debug mode.
-    *ctr = ctr
-      .checked_add(num)
-      .expect("WaitGroup counter overflow");
+    *ctr = ctr.checked_add(num).expect("WaitGroup counter overflow");
     Self {
       inner: self.inner.clone(),
     }
