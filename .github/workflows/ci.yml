@@ -34,11 +34,11 @@ jobs:
     name: rustfmt
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
-    - name: Install Rust
-      run: rustup update stable && rustup default stable && rustup component add rustfmt
-    - name: Check formatting
-      run: cargo fmt --all -- --check
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        run: rustup update stable && rustup default stable && rustup component add rustfmt
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
 
   # Verify the declared MSRV in Cargo.toml still builds.
@@ -49,16 +49,16 @@ jobs:
       # MSRV may emit lints that current stable does not; don't fail on them.
       RUSTFLAGS: ""
     steps:
-    - uses: actions/checkout@v6
-    - name: Read MSRV from Cargo.toml
-      id: msrv
-      run: |
-        ver=$(grep -m1 '^rust-version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
-        echo "version=$ver" >> "$GITHUB_OUTPUT"
-    - name: Install MSRV toolchain (${{ steps.msrv.outputs.version }})
-      run: rustup toolchain install ${{ steps.msrv.outputs.version }} --profile minimal
-    - name: cargo +MSRV check --all-features
-      run: cargo +${{ steps.msrv.outputs.version }} check --all-features
+      - uses: actions/checkout@v6
+      - name: Read MSRV from Cargo.toml
+        id: msrv
+        run: |
+          ver=$(grep -m1 '^rust-version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+      - name: Install MSRV toolchain (${{ steps.msrv.outputs.version }})
+        run: rustup toolchain install ${{ steps.msrv.outputs.version }} --profile minimal
+      - name: cargo +MSRV check --all-features
+        run: cargo +${{ steps.msrv.outputs.version }} check --all-features
 
 
   # Apply clippy lints
@@ -72,14 +72,14 @@ jobs:
           - windows-latest
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v6
-    - name: Install Rust
-      # --no-self-update is necessary because the windows environment cannot self-update rustup.exe.
-      run: rustup update stable --no-self-update && rustup default stable && rustup component add clippy
-    - name: Install cargo-hack
-      run: cargo install cargo-hack
-    - name: Apply clippy lints
-      run: cargo hack clippy --each-feature
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        # --no-self-update is necessary because the windows environment cannot self-update rustup.exe.
+        run: rustup update stable --no-self-update && rustup default stable && rustup component add clippy
+      - name: Install cargo-hack
+        run: cargo install cargo-hack
+      - name: Apply clippy lints
+        run: cargo hack clippy --each-feature
 
   # Run tests on some extra platforms
   cross:
@@ -127,6 +127,11 @@ jobs:
         run: |
           rustup target add ${{ matrix.target }}
           cargo build --target ${{ matrix.target }}
+      - name: cargo check --all-features --target ${{ matrix.target }}
+        # Catches platform-specific conditional-compilation misses like
+        # `EventListener::wait()` not existing on wasm. Runs in addition
+        # to the default-features build above.
+        run: cargo check --all-features --target ${{ matrix.target }}
 
   build:
     name: build
@@ -138,24 +143,31 @@ jobs:
           - windows-latest
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v6
-    - name: Cache cargo build and registry
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-build-
-    - name: Install Rust
-      # --no-self-update is necessary because the windows environment cannot self-update rustup.exe.
-      run: rustup update stable --no-self-update && rustup default stable
-    - name: Install cargo-hack
-      run: cargo install cargo-hack
-    - name: Run build
-      run: cargo hack build --each-feature
+      - uses: actions/checkout@v6
+      - name: Cache cargo build and registry
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+      - name: Install Rust
+        # --no-self-update is necessary because the windows environment cannot self-update rustup.exe.
+        run: rustup update stable --no-self-update && rustup default stable
+      - name: Install cargo-hack
+        run: cargo install cargo-hack
+      - name: Run build (individual features)
+        run: cargo hack build --each-feature
+      - name: Run build (feature pairs)
+        # `--each-feature` misses multi-feature combinations like
+        # `alloc + future` that the README advertises. Test those
+        # explicitly.
+        run: |
+          cargo build --no-default-features --features alloc,future
+          cargo build --all-features
   
   test:
     name: test
@@ -167,24 +179,30 @@ jobs:
           - windows-latest
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v6
-    - name: Cache cargo build and registry
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-test-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-test-
-    - name: Install Rust
-      # --no-self-update is necessary because the windows environment cannot self-update rustup.exe.
-      run: rustup update stable --no-self-update && rustup default stable
-    - name: Install cargo-hack
-      run: cargo install cargo-hack
-    - name: Run test
-      run: cargo hack test --each-feature
+      - uses: actions/checkout@v6
+      - name: Cache cargo build and registry
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-test-
+      - name: Install Rust
+        # --no-self-update is necessary because the windows environment cannot self-update rustup.exe.
+        run: rustup update stable --no-self-update && rustup default stable
+      - name: Install cargo-hack
+        run: cargo install cargo-hack
+      - name: Run test (individual features)
+        run: cargo hack test --each-feature
+      - name: Run test (feature pairs)
+        # Cover the `alloc + future` combination that cargo-hack's
+        # `--each-feature` mode does not reach, plus the full set.
+        run: |
+          cargo test --no-default-features --features alloc,future
+          cargo test --all-features
 
   coverage:
     name: coverage
