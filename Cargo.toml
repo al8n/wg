@@ -6,12 +6,12 @@ homepage = "https://github.com/al8n/wg"
 repository = "https://github.com/al8n/wg.git"
 documentation = "https://docs.rs/wg/"
 readme = "README.md"
-version = "1.0.1"
+version = "1.1.0"
 license = "MIT OR Apache-2.0"
 keywords = ["waitgroup", "async", "sync", "notify", "wake"]
 categories = ["asynchronous", "concurrency", "data-structures", "no-std"]
 edition = "2021"
-rust-version = "1.76.0"
+rust-version = "1.95.0"
 
 [[example]]
 name = "sync"
