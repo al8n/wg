@@ -183,7 +183,7 @@ impl WaitGroup {
     self
       .inner
       .counter
-      .fetch_update(Ordering::Release, Ordering::Relaxed, |prev| {
+      .try_update(Ordering::Release, Ordering::Relaxed, |prev| {
         prev.checked_add(num)
       })
       .expect("WaitGroup counter overflow");
@@ -218,7 +218,7 @@ impl WaitGroup {
     match self
       .inner
       .counter
-      .fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| v.checked_sub(1))
+      .try_update(Ordering::AcqRel, Ordering::Acquire, |v| v.checked_sub(1))
     {
       Ok(old) => {
         let remaining = old - 1;

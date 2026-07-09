@@ -198,7 +198,7 @@ impl WaitGroup {
     self
       .inner
       .counter
-      .fetch_update(Ordering::Release, Ordering::Relaxed, |prev| {
+      .try_update(Ordering::Release, Ordering::Relaxed, |prev| {
         prev.checked_add(num)
       })
       .unwrap_or_else(|prev| panic!("WaitGroup counter overflow: prev={prev}, num={num}"));
@@ -215,7 +215,7 @@ impl WaitGroup {
     match self
       .inner
       .counter
-      .fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| v.checked_sub(1))
+      .try_update(Ordering::AcqRel, Ordering::Acquire, |v| v.checked_sub(1))
     {
       Ok(old) => old - 1,
       // Over-done: counter was already zero. Silently no-op.
