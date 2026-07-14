@@ -39,7 +39,7 @@ event-listener = { version = "5", optional = true, default-features = false, fea
 pin-project-lite = { version = "0.2", optional = true }
 
 [dev-dependencies]
-agnostic-lite = { version = "0.6", features = ["smol", "tokio", "time"] }
+agnostic-lite = { version = "0.7", features = ["smol", "tokio", "time"] }
 tokio = { version = "1", features = ["full"] }
 smol = "2"
 
