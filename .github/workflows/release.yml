@@ -70,14 +70,22 @@ jobs:
               exit 1
             fi
 
-            git fetch --no-tags --force --depth=1 origin \
-              refs/heads/main:refs/remotes/origin/main
-            tag_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
+            remote_tag_ref="refs/remotes/origin/release-tag-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            git update-ref -d "$remote_tag_ref"
+            if ! git fetch --no-tags --force --depth=1 origin \
+              "refs/tags/${tag}:${remote_tag_ref}" \
+              refs/heads/main:refs/remotes/origin/main; then
+              echo "::error::Release tag $tag or main is missing from origin"
+              exit 1
+            fi
+            remote_tag_commit="$(git rev-parse "${remote_tag_ref}^{commit}")"
+            event_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
             main_commit="$(git rev-parse 'refs/remotes/origin/main^{commit}')"
-            if [[ "$tag_commit" != "$main_commit" ]]; then
-              echo "::error::Release tag must point to the current main commit"
-              echo "tag commit:  $tag_commit"
-              echo "main commit: $main_commit"
+            if [[ "$remote_tag_commit" != "$event_commit" || "$event_commit" != "$main_commit" ]]; then
+              echo "::error::Remote release tag, event SHA, and current main must resolve to one commit"
+              echo "remote tag commit: $remote_tag_commit"
+              echo "event commit:      $event_commit"
+              echo "main commit:       $main_commit"
               exit 1
             fi
           fi
@@ -128,14 +136,22 @@ jobs:
             exit 1
           fi
 
-          git fetch --no-tags --force --depth=1 origin \
-            refs/heads/main:refs/remotes/origin/main
-          tag_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
+          remote_tag_ref="refs/remotes/origin/release-tag-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git update-ref -d "$remote_tag_ref"
+          if ! git fetch --no-tags --force --depth=1 origin \
+            "refs/tags/${EXPECTED_TAG}:${remote_tag_ref}" \
+            refs/heads/main:refs/remotes/origin/main; then
+            echo "::error::Release tag $EXPECTED_TAG or main is missing from origin"
+            exit 1
+          fi
+          remote_tag_commit="$(git rev-parse "${remote_tag_ref}^{commit}")"
+          event_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
           main_commit="$(git rev-parse 'refs/remotes/origin/main^{commit}')"
-          if [[ "$tag_commit" != "$main_commit" ]]; then
-            echo "::error::Release tag no longer points to the current main commit"
-            echo "tag commit:  $tag_commit"
-            echo "main commit: $main_commit"
+          if [[ "$remote_tag_commit" != "$event_commit" || "$event_commit" != "$main_commit" ]]; then
+            echo "::error::Remote release tag, event SHA, and current main must still resolve to one commit"
+            echo "remote tag commit: $remote_tag_commit"
+            echo "event commit:      $event_commit"
+            echo "main commit:       $main_commit"
             exit 1
           fi
       - name: Check crates.io publication state
@@ -171,6 +187,7 @@ jobs:
                   '
                     if (
                       .version.num == $version
+                      and .version.yanked == false
                       and .version.trustpub_data.provider == "github"
                       and .version.trustpub_data.repository == $repository
                       and .version.trustpub_data.sha == $sha
@@ -260,6 +277,7 @@ jobs:
                 --arg sha "$GITHUB_SHA" \
                 '
                   .version.num == $version
+                  and .version.yanked == false
                   and .version.trustpub_data.provider == "github"
                   and .version.trustpub_data.repository == $repository
                   and .version.trustpub_data.run_id == $run_id
@@ -303,6 +321,7 @@ jobs:
         env:
           EXPECTED_PRERELEASE: ${{ needs.verify.outputs.prerelease }}
           EXPECTED_TAG: ${{ needs.verify.outputs.tag }}
+          EXPECTED_VERSION: ${{ needs.verify.outputs.version }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -315,6 +334,35 @@ jobs:
           )"
           if [[ "$resolved_sha" != "$GITHUB_SHA" ]]; then
             echo "::error::Release tag no longer resolves to the publishing commit"
+            exit 1
+          fi
+
+          version_response="$RUNNER_TEMP/crates-io-version.json"
+          registry_status="$(
+            curl --silent --show-error \
+              --header 'Accept: application/json' \
+              --header 'User-Agent: al8n/wg release workflow' \
+              --output "$version_response" \
+              --write-out '%{http_code}' \
+              "https://crates.io/api/v1/crates/wg/${EXPECTED_VERSION}"
+          )"
+          if [[ "$registry_status" != "200" ]] || ! jq -e \
+            --arg version "$EXPECTED_VERSION" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg sha "$GITHUB_SHA" \
+            '
+              .version.num == $version
+              and .version.yanked == false
+              and .version.trustpub_data.provider == "github"
+              and .version.trustpub_data.repository == $repository
+              and .version.trustpub_data.sha == $sha
+            ' "$version_response" >/dev/null; then
+            echo "::error::crates.io version is absent, yanked, or has mismatched provenance"
+            if [[ -s "$version_response" ]]; then
+              jq -c \
+                '{version: .version.num, yanked: .version.yanked, trustpub_data: .version.trustpub_data}' \
+                "$version_response" >&2 || true
+            fi
             exit 1
           fi
 
