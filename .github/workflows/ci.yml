@@ -218,25 +218,38 @@ jobs:
       - uses: actions/checkout@v7
       - name: Install Rust
         run: rustup update nightly && rustup default nightly
-      - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin
-      - name: Cache cargo build and registry
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov@0.9.1
+      - name: Log coverage tool versions
+        run: |
+          rustc --version
+          cargo llvm-cov --version
+      - name: Cache cargo registry
         uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
-          key: ${{ runner.os }}-coverage-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-coverage-registry-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-coverage-
-      - name: Run tarpaulin
-        env:
-          RUSTFLAGS: "--cfg tarpaulin"
-        run: cargo tarpaulin --engine llvm --all-features --run-types tests --run-types doctests --workspace --out xml
+            ${{ runner.os }}-coverage-registry-
+      - name: Run llvm-cov
+        run: cargo llvm-cov --workspace --all-features --doctests --lcov --output-path lcov.info
+      - name: Upload lcov-info
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lcov-info
+          path: lcov.info
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v7
         with:
+          files: lcov.info
+          disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: ${{ github.repository }}
           fail_ci_if_error: true
