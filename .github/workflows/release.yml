@@ -1,0 +1,436 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    name: Verify release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Install Rust 1.95.0
+        run: rustup toolchain install 1.95.0 --profile minimal
+      - name: Derive and verify release identity
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          metadata="$(cargo +1.95.0 metadata --no-deps --format-version 1)"
+          version="$(
+            jq -er '
+              [.packages[] | select(.name == "wg") | .version]
+              | if length == 1
+                then .[0]
+                else error("expected exactly one wg package")
+                end
+            ' <<<"$metadata"
+          )"
+          tag="v${version}"
+          version_without_build="${version%%+*}"
+          if [[ "$version_without_build" == *-* ]]; then
+            prerelease=true
+          else
+            prerelease=false
+          fi
+
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "prerelease=$prerelease"
+          } >>"$GITHUB_OUTPUT"
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            if [[ "$GITHUB_REF_TYPE" != "tag" || "$GITHUB_REF_NAME" != "$tag" ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match Cargo.toml version $version"
+              exit 1
+            fi
+
+            remote_tag_ref="refs/remotes/origin/release-tag-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            git update-ref -d "$remote_tag_ref"
+            if ! git fetch --no-tags --force --depth=1 origin \
+              "refs/tags/${tag}:${remote_tag_ref}" \
+              refs/heads/main:refs/remotes/origin/main; then
+              echo "::error::Release tag $tag or main is missing from origin"
+              exit 1
+            fi
+            remote_tag_commit="$(git rev-parse "${remote_tag_ref}^{commit}")"
+            event_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
+            main_commit="$(git rev-parse 'refs/remotes/origin/main^{commit}')"
+            if [[ "$remote_tag_commit" != "$event_commit" || "$event_commit" != "$main_commit" ]]; then
+              echo "::error::Remote release tag, event SHA, and current main must resolve to one commit"
+              echo "remote tag commit: $remote_tag_commit"
+              echo "event commit:      $event_commit"
+              echo "main commit:       $main_commit"
+              exit 1
+            fi
+          fi
+      - name: Test all features
+        run: cargo +1.95.0 test --all-features
+      - name: Verify package
+        run: cargo +1.95.0 publish --dry-run
+
+  publish:
+    name: Publish to crates.io
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: crates-io
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Install Rust 1.95.0
+        run: rustup toolchain install 1.95.0 --profile minimal
+      - name: Reverify release identity after approval
+        shell: bash
+        env:
+          EXPECTED_TAG: ${{ needs.verify.outputs.tag }}
+          EXPECTED_VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          metadata="$(cargo +1.95.0 metadata --no-deps --format-version 1)"
+          version="$(
+            jq -er '
+              [.packages[] | select(.name == "wg") | .version]
+              | if length == 1
+                then .[0]
+                else error("expected exactly one wg package")
+                end
+            ' <<<"$metadata"
+          )"
+          if [[ "$version" != "$EXPECTED_VERSION" || "$GITHUB_REF_NAME" != "$EXPECTED_TAG" ]]; then
+            echo "::error::Release identity changed while awaiting approval"
+            exit 1
+          fi
+
+          remote_tag_ref="refs/remotes/origin/release-tag-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git update-ref -d "$remote_tag_ref"
+          if ! git fetch --no-tags --force --depth=1 origin \
+            "refs/tags/${EXPECTED_TAG}:${remote_tag_ref}" \
+            refs/heads/main:refs/remotes/origin/main; then
+            echo "::error::Release tag $EXPECTED_TAG or main is missing from origin"
+            exit 1
+          fi
+          remote_tag_commit="$(git rev-parse "${remote_tag_ref}^{commit}")"
+          event_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
+          main_commit="$(git rev-parse 'refs/remotes/origin/main^{commit}')"
+          if [[ "$remote_tag_commit" != "$event_commit" || "$event_commit" != "$main_commit" ]]; then
+            echo "::error::Remote release tag, event SHA, and current main must still resolve to one commit"
+            echo "remote tag commit: $remote_tag_commit"
+            echo "event commit:      $event_commit"
+            echo "main commit:       $main_commit"
+            exit 1
+          fi
+      - name: Check crates.io publication state
+        id: registry
+        shell: bash
+        env:
+          EXPECTED_TAG: ${{ needs.verify.outputs.tag }}
+          EXPECTED_VERSION: ${{ needs.verify.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          version_response="$RUNNER_TEMP/crates-io-version.json"
+          http_status="$(
+            curl --silent --show-error \
+              --header 'Accept: application/json' \
+              --header 'User-Agent: al8n/wg release workflow' \
+              --output "$version_response" \
+              --write-out '%{http_code}' \
+              "https://crates.io/api/v1/crates/wg/${EXPECTED_VERSION}"
+          )"
+
+          case "$http_status" in
+            404)
+              echo 'state=absent' >>"$GITHUB_OUTPUT"
+              ;;
+            200)
+              if ! run_id="$(
+                jq -er \
+                  --arg version "$EXPECTED_VERSION" \
+                  --arg repository "$GITHUB_REPOSITORY" \
+                  --arg sha "$GITHUB_SHA" \
+                  '
+                    if (
+                      .version.num == $version
+                      and .version.yanked == false
+                      and .version.trustpub_data.provider == "github"
+                      and .version.trustpub_data.repository == $repository
+                      and .version.trustpub_data.sha == $sha
+                      and (.version.trustpub_data.run_id | type == "string")
+                      and (.version.trustpub_data.run_id | test("^[0-9]+$"))
+                    )
+                    then .version.trustpub_data.run_id
+                    else error("existing version provenance does not match")
+                    end
+                  ' "$version_response"
+              )"; then
+                echo "::error::Version $EXPECTED_VERSION already exists with mismatched provenance"
+                jq -c '{version: .version.num, trustpub_data: .version.trustpub_data}' \
+                  "$version_response" >&2 || true
+                exit 1
+              fi
+
+              run_response="$RUNNER_TEMP/github-run.json"
+              if ! gh api \
+                "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" \
+                >"$run_response"; then
+                echo "::error::Unable to validate publishing workflow run $run_id"
+                exit 1
+              fi
+
+              if ! jq -e \
+                --arg run_id "$run_id" \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --arg workflow '.github/workflows/release.yml' \
+                --arg tag "$EXPECTED_TAG" \
+                --arg sha "$GITHUB_SHA" \
+                '
+                  (.id | tostring) == $run_id
+                  and .repository.full_name == $repository
+                  and .path == $workflow
+                  and .event == "push"
+                  and .head_branch == $tag
+                  and .head_sha == $sha
+                ' "$run_response" >/dev/null; then
+                echo "::error::Existing version references a different publishing workflow run"
+                jq -c \
+                  '{id, repository: .repository.full_name, path, event, head_branch, head_sha}' \
+                  "$run_response" >&2 || true
+                exit 1
+              fi
+
+              echo 'state=matching' >>"$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Unexpected crates.io response: HTTP $http_status"
+              exit 1
+              ;;
+          esac
+      - name: Authenticate with crates.io
+        if: steps.registry.outputs.state == 'absent'
+        id: crates-io-auth
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9
+      - name: Publish wg
+        if: steps.registry.outputs.state == 'absent'
+        run: cargo +1.95.0 publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}
+      - name: Verify published provenance
+        if: steps.registry.outputs.state == 'absent'
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          version_response="$RUNNER_TEMP/crates-io-version.json"
+          for attempt in {1..12}; do
+            http_status="$(
+              curl --silent --show-error \
+                --header 'Accept: application/json' \
+                --header 'User-Agent: al8n/wg release workflow' \
+                --output "$version_response" \
+                --write-out '%{http_code}' \
+                "https://crates.io/api/v1/crates/wg/${EXPECTED_VERSION}"
+            )"
+
+            if [[ "$http_status" == "200" ]]; then
+              if jq -e \
+                --arg version "$EXPECTED_VERSION" \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --arg run_id "$GITHUB_RUN_ID" \
+                --arg sha "$GITHUB_SHA" \
+                '
+                  .version.num == $version
+                  and .version.yanked == false
+                  and .version.trustpub_data.provider == "github"
+                  and .version.trustpub_data.repository == $repository
+                  and .version.trustpub_data.run_id == $run_id
+                  and .version.trustpub_data.sha == $sha
+                ' "$version_response" >/dev/null; then
+                exit 0
+              fi
+
+              echo "::error::Published version has mismatched provenance"
+              jq -c '{version: .version.num, trustpub_data: .version.trustpub_data}' \
+                "$version_response" >&2 || true
+              exit 1
+            fi
+
+            if [[ "$http_status" != "404" ]]; then
+              echo "::error::Unexpected crates.io response: HTTP $http_status"
+              exit 1
+            fi
+
+            if (( attempt < 12 )); then
+              sleep 5
+            fi
+          done
+
+          echo "::error::Published version did not become visible on crates.io"
+          exit 1
+
+  github-release:
+    name: Create GitHub Release
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+    needs:
+      - verify
+      - publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Create or verify GitHub Release
+        shell: bash
+        env:
+          EXPECTED_PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+          EXPECTED_TAG: ${{ needs.verify.outputs.tag }}
+          EXPECTED_VERSION: ${{ needs.verify.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          encoded_tag="$(jq -rn --arg tag "$EXPECTED_TAG" '$tag | @uri')"
+          resolved_sha="$(
+            gh api \
+              "repos/${GITHUB_REPOSITORY}/commits/${encoded_tag}" \
+              --jq '.sha'
+          )"
+          if [[ "$resolved_sha" != "$GITHUB_SHA" ]]; then
+            echo "::error::Release tag no longer resolves to the publishing commit"
+            exit 1
+          fi
+
+          version_response="$RUNNER_TEMP/crates-io-version.json"
+          registry_status="$(
+            curl --silent --show-error \
+              --header 'Accept: application/json' \
+              --header 'User-Agent: al8n/wg release workflow' \
+              --output "$version_response" \
+              --write-out '%{http_code}' \
+              "https://crates.io/api/v1/crates/wg/${EXPECTED_VERSION}"
+          )"
+          if [[ "$registry_status" != "200" ]] || ! jq -e \
+            --arg version "$EXPECTED_VERSION" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg sha "$GITHUB_SHA" \
+            '
+              .version.num == $version
+              and .version.yanked == false
+              and .version.trustpub_data.provider == "github"
+              and .version.trustpub_data.repository == $repository
+              and .version.trustpub_data.sha == $sha
+            ' "$version_response" >/dev/null; then
+            echo "::error::crates.io version is absent, yanked, or has mismatched provenance"
+            if [[ -s "$version_response" ]]; then
+              jq -c \
+                '{version: .version.num, yanked: .version.yanked, trustpub_data: .version.trustpub_data}' \
+                "$version_response" >&2 || true
+            fi
+            exit 1
+          fi
+
+          release_response="$RUNNER_TEMP/github-release.json"
+          http_status="$(
+            curl --silent --show-error \
+              --header 'Accept: application/vnd.github+json' \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header 'X-GitHub-Api-Version: 2026-03-10' \
+              --output "$release_response" \
+              --write-out '%{http_code}' \
+              "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/releases/tags/${encoded_tag}"
+          )"
+
+          case "$http_status" in
+            200)
+              if ! jq -e \
+                --arg tag "$EXPECTED_TAG" \
+                --argjson prerelease "$EXPECTED_PRERELEASE" \
+                '
+                  .tag_name == $tag
+                  and .draft == false
+                  and .prerelease == $prerelease
+                ' "$release_response" >/dev/null; then
+                echo "::error::Existing GitHub Release has mismatched state"
+                jq -c '{tag_name, draft, prerelease}' "$release_response" >&2 || true
+                exit 1
+              fi
+              ;;
+            404)
+              if [[ "$EXPECTED_PRERELEASE" == "true" ]]; then
+                make_latest=false
+              else
+                make_latest=legacy
+              fi
+
+              create_response="$RUNNER_TEMP/created-github-release.json"
+              jq -n \
+                --arg tag "$EXPECTED_TAG" \
+                --arg sha "$GITHUB_SHA" \
+                --argjson prerelease "$EXPECTED_PRERELEASE" \
+                --arg make_latest "$make_latest" \
+                '{
+                  tag_name: $tag,
+                  target_commitish: $sha,
+                  name: $tag,
+                  draft: false,
+                  prerelease: $prerelease,
+                  generate_release_notes: true,
+                  make_latest: $make_latest
+                }' \
+                | gh api \
+                    --method POST \
+                    "repos/${GITHUB_REPOSITORY}/releases" \
+                    --input - \
+                    >"$create_response"
+
+              jq -e \
+                --arg tag "$EXPECTED_TAG" \
+                --argjson prerelease "$EXPECTED_PRERELEASE" \
+                '
+                  .tag_name == $tag
+                  and .draft == false
+                  and .prerelease == $prerelease
+                ' "$create_response" >/dev/null
+              ;;
+            *)
+              echo "::error::Unexpected GitHub Releases response: HTTP $http_status"
+              exit 1
+              ;;
+          esac
